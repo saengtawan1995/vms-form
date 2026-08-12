@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>🔧 แจ้งซ่อมบำรุง · VMS</title>
+<!-- LIFF SDK (ยืนยันตัวตนผู้แจ้งจาก LINE จริง) -->
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
   :root{ --blue:#3D7EDB; --blue-d:#2B5FA8; --bg:#f4f6f8; --line:#e0e4e8; --gray:#8a8a8a; --ok:#2E7D32; --err:#C62828; --warn:#E8A13A; }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -16,6 +18,8 @@
   input,select,textarea{ width:100%; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:#1a1a1a; font-family:inherit; }
   textarea{ min-height:70px; resize:vertical; }
   input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--blue); }
+  .lockbox{ width:100%; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#f0f4fb; color:#1a1a1a; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .lockbox .vf{ color:var(--ok); font-size:14px; font-weight:700; }
   .hint{ font-size:12px; color:var(--gray); margin-top:4px; }
   .photos{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
   .thumb{ position:relative; width:84px; height:84px; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
@@ -32,6 +36,7 @@
   .who{ font-size:12px; color:var(--gray); text-align:center; margin:2px 0 12px; }
   .msg{ padding:10px 12px; border-radius:10px; font-size:14px; margin-bottom:10px; display:none; }
   .msg.err{ background:#fdecea; color:var(--err); display:block; }
+  .loading{ text-align:center; padding:60px 16px; color:var(--gray); }
   .done{ display:none; text-align:center; padding:30px 16px; }
   .done .ic{ font-size:56px; }
   .done h2{ color:var(--ok); margin:10px 0 4px; }
@@ -45,12 +50,16 @@
 <body>
   <div class="head">🔧 แจ้งซ่อมบำรุง</div>
 
-  <div class="wrap" id="formView">
+  <!-- ระหว่างยืนยันตัวตน + โหลดข้อมูล -->
+  <div class="wrap loading" id="loadView">กำลังยืนยันตัวตนผ่าน LINE…</div>
+
+  <div class="wrap" id="formView" style="display:none">
     <div class="msg err" id="err"></div>
 
     <div class="card">
       <label style="margin-top:0">ผู้แจ้ง <span class="req">*</span></label>
-      <select id="reporter"><option value="">— กำลังโหลดรายชื่อ —</option></select>
+      <div class="lockbox" id="reporter"><span class="vf">✓</span><span id="reporterName">—</span></div>
+      <div class="hint">ยืนยันตัวตนจากบัญชี LINE ของคุณโดยอัตโนมัติ (แก้ไขไม่ได้)</div>
 
       <label>รถ / เครื่องจักร <span class="req">*</span></label>
       <select id="vehicle"><option value="">— กำลังโหลดรายชื่อ —</option></select>
@@ -99,41 +108,36 @@
   </div>
 
 <script>
-  var USER_ID = "";
+  // ============================================================
+  //  ตั้งค่า 2 จุด (แก้ครั้งเดียว)
+  // ============================================================
+  var LIFF_ID = "2011005895-tXtEV8U6";                 // LIFF ID (เปิดเผยได้)
+  var API_URL = "PASTE_YOUR_EXEC_URL_HERE";            // ⬅️ วาง URL /exec ของ Apps Script (ลงท้าย /exec)
+  // ============================================================
+
   var REPORTER_NAME = "";
   var PHOTOS = [];
   var VEHICLES = {};
   var WORK = "", URG = "";
-  var LS_KEY = "vms_reporter_id";
 
   function $(id){ return document.getElementById(id); }
   function showErr(t){ var e=$('err'); e.textContent=t; e.style.display=t?'block':'none'; if(t) window.scrollTo(0,0); }
+  function showLoad(t){ $('loadView').textContent=t; $('loadView').style.display='block'; $('formView').style.display='none'; }
 
-  function loadReporters(){
-    google.script.run
-      .withSuccessHandler(fillReporters)
-      .withFailureHandler(function(e){ showErr('โหลดรายชื่อผู้แจ้งไม่สำเร็จ: '+e.message); })
-      .getReporterOptions();
-  }
-  function fillReporters(list){
-    var sel=$('reporter'); sel.innerHTML='<option value="">— เลือกชื่อผู้แจ้ง —</option>';
-    var last=''; try{ last=localStorage.getItem(LS_KEY)||''; }catch(e){}
-    (list||[]).forEach(function(u){
-      var o=document.createElement('option');
-      o.value=u.id||('name:'+u.name);   // ถ้าไม่มี UserID ใช้ชื่อเป็น key ชั่วคราว
-      o.textContent=u.name;
-      o.setAttribute('data-name', u.name);
-      sel.appendChild(o);
-    });
-    if(last){ sel.value=last; }
+  // เรียก API หลังบ้าน (แนบ access token ของผู้ใช้ทุกครั้ง — หลังบ้านยืนยันตัวตนเอง)
+  function apiCall(action, extra){
+    var token = liff.getAccessToken();
+    if(!token) return Promise.reject(new Error('ไม่พบ token — กรุณาเปิดฟอร์มผ่าน LINE อีกครั้ง'));
+    var body = { action: action, accessToken: token };
+    if(extra){ for(var k in extra) body[k]=extra[k]; }
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // simple request → เลี่ยง CORS preflight
+      body: JSON.stringify(body),
+      redirect: 'follow'
+    }).then(function(r){ return r.json(); });
   }
 
-  function loadVehicles(){
-    google.script.run
-      .withSuccessHandler(fillVehicles)
-      .withFailureHandler(function(e){ showErr('โหลดรายชื่อรถไม่สำเร็จ: '+e.message); })
-      .getVehicleOptions();
-  }
   function fillVehicles(list){
     var sel=$('vehicle'); sel.innerHTML='<option value="">— เลือกรถ —</option>';
     (list||[]).forEach(function(v){
@@ -184,36 +188,29 @@
 
   function submit(){
     showErr('');
-    var repSel=$('reporter'), repVal=repSel.value;
     var vId=$('vehicle').value, detail=$('detail').value.trim();
-    if(!repVal){ showErr('กรุณาเลือกผู้แจ้ง'); return; }
     if(!vId){ showErr('กรุณาเลือกรถ'); return; }
     if(!WORK){ showErr('กรุณาเลือกประเภทงาน'); return; }
     if(!URG){ showErr('กรุณาเลือกความเร่งด่วน'); return; }
     if(!detail){ showErr('กรุณากรอกอาการ / สิ่งที่ต้องทำ'); return; }
 
-    // repVal = UserID จริง หรือ "name:ชื่อ" ถ้ายังไม่มี UserID ในระบบ
-    USER_ID = repVal.indexOf('name:')===0 ? '' : repVal;
-    REPORTER_NAME = repSel.options[repSel.selectedIndex].getAttribute('data-name') || '';
-    try{ localStorage.setItem(LS_KEY, repVal); }catch(e){}
+    var data={ vehicleId:vId, workType:WORK, urgency:URG, detail:detail, estCost:$('estCost').value };
+    var photos = PHOTOS.map(function(p){ return { base64:p.base64, mimeType:p.mimeType }; });
 
-    var payload={
-      userId: USER_ID,
-      data:{ vehicleId:vId, workType:WORK, urgency:URG, detail:detail, estCost:$('estCost').value, reporterName:REPORTER_NAME },
-      photos: PHOTOS.map(function(p){ return { base64:p.base64, mimeType:p.mimeType }; })
-    };
     var b=$('submit'); b.disabled=true; b.textContent='กำลังส่ง…';
-    google.script.run
-      .withSuccessHandler(onDone)
-      .withFailureHandler(function(e){ b.disabled=false; b.textContent='ส่งขออนุมัติ'; showErr('ส่งไม่สำเร็จ: '+e.message); })
-      .submitIssue(payload);
+    apiCall('submitIssue', { data:data, photos:photos })
+      .then(function(res){
+        if(!res || !res.ok){ throw new Error((res&&res.message) || 'ส่งไม่สำเร็จ'); }
+        onDone(res.result||{});
+      })
+      .catch(function(e){ b.disabled=false; b.textContent='ส่งขออนุมัติ'; showErr('ส่งไม่สำเร็จ: '+e.message); });
   }
 
   function onDone(res){
     res=res||{};
     $('formView').style.display='none'; $('doneView').style.display='block';
     $('doneNo').textContent='เลขที่แจ้ง: '+(res.issueId||'-');
-    var rows=[ ['ประเภทงาน', WORK||'-'], ['ความเร่งด่วน', URG||'-'], ['สถานะ', res.status||'รออนุมัติ'] ];
+    var rows=[ ['ผู้แจ้ง', REPORTER_NAME||'-'], ['ประเภทงาน', WORK||'-'], ['ความเร่งด่วน', URG||'-'], ['สถานะ', res.status||'รออนุมัติ'] ];
     $('doneSum').innerHTML=rows.map(function(r){ return '<div class="r"><span class="k">'+r[0]+'</span><span>'+r[1]+'</span></div>'; }).join('');
     window.scrollTo(0,0);
   }
@@ -229,21 +226,43 @@
   }
 
   function closeWindow(){
-    // พยายามปิดหน้าต่าง (เบราว์เซอร์ในแอป LINE) — ถ้าปิดไม่ได้ ให้รีเซ็ตฟอร์มแทน
-    try{ window.close(); }catch(e){}
-    setTimeout(function(){ resetForm(); }, 300);
+    if(liff.isInClient()){ liff.closeWindow(); }
+    else { resetForm(); }
   }
 
-  window.onload=function(){
+  function bindEvents(){
     $('workSeg').onclick=onSeg('workSeg','data-work',function(v){ WORK=v; });
     $('urgSeg').onclick=onSeg('urgSeg','data-urg',function(v){ URG=v; });
     $('file').onchange=onFile;
     $('submit').onclick=submit;
     $('again').onclick=resetForm;
     $('close').onclick=closeWindow;
+  }
 
-    loadReporters();
-    loadVehicles();
+  // ── เริ่มระบบ: LIFF init → ยืนยันตัวตน → โหลดชื่อ+รถ ──
+  function startApp(){
+    liff.init({ liffId: LIFF_ID })
+      .then(function(){
+        if(!liff.isLoggedIn()){ liff.login(); return; }   // ยังไม่ได้ล็อกอิน → พาไปล็อกอิน
+        showLoad('กำลังโหลดข้อมูล…');
+        return apiCall('getBootstrap').then(function(res){
+          if(!res || !res.ok){ throw new Error((res&&res.message) || 'ยืนยันตัวตนไม่สำเร็จ'); }
+          REPORTER_NAME = res.name || '(ไม่พบชื่อ)';
+          $('reporterName').textContent = REPORTER_NAME;
+          fillVehicles(res.vehicles);
+          $('loadView').style.display='none';
+          $('formView').style.display='block';
+        });
+      })
+      .catch(function(e){
+        showLoad('เกิดข้อผิดพลาด: ' + (e && e.message ? e.message : e) + '\nกรุณาปิดแล้วเปิดใหม่ผ่าน LINE');
+      });
+  }
+
+  window.onload=function(){
+    bindEvents();
+    if(API_URL.indexOf('PASTE_YOUR') === 0){ showLoad('⚠️ ยังไม่ได้ตั้งค่า API_URL ในไฟล์ form_issue.html'); return; }
+    startApp();
   };
 </script>
 </body>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>🛠️ บันทึกงานซ่อม · VMS</title>
+<!-- LIFF SDK (ยืนยันตัวตนผู้บันทึกจาก LINE จริง) -->
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{ --green:#2E7D32; --green-d:#1B5E20; --bg:#f4f6f8; --line:#e0e4e8; --gray:#8a8a8a; --ok:#2E7D32; --err:#C62828; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:-apple-system,"Segoe UI","Sarabun",sans-serif; background:var(--bg); color:#1a1a1a; }
+  .head{ background:var(--green); color:#fff; padding:16px; font-size:18px; font-weight:700; position:sticky; top:0; z-index:5; }
+  .wrap{ padding:14px; max-width:520px; margin:0 auto; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  label{ display:block; font-size:13px; color:#333; font-weight:600; margin:10px 0 5px; }
+  label .req{ color:var(--err); }
+  input,select,textarea{ width:100%; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:#1a1a1a; font-family:inherit; }
+  textarea{ min-height:56px; resize:vertical; }
+  input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--green); }
+  .row{ display:flex; gap:10px; }
+  .row>div{ flex:1; }
+  .hint{ font-size:12px; color:var(--gray); margin-top:4px; }
+  .lockbox{ width:100%; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#eaf5ea; color:#1a1a1a; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .lockbox .vf{ color:var(--ok); font-size:14px; font-weight:700; }
+  .refbox{ background:#eaf5ea; border:1px solid #b3d9b3; border-radius:10px; padding:10px 12px; font-size:14px; color:var(--green-d); }
+  .refbox .no{ font-weight:700; }
+  .refbox .dt{ color:#33691e; margin-top:3px; font-weight:400; }
+  .preview{ background:#eaf5ea; border:1px dashed #b3d9b3; border-radius:10px; padding:10px 12px; font-size:14px; color:var(--green-d); margin-top:10px; display:none; }
+  .preview b{ font-size:17px; }
+  .photos{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .thumb{ position:relative; width:84px; height:84px; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
+  .thumb img{ width:100%; height:100%; object-fit:cover; }
+  .thumb .x{ position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; width:22px; height:22px; border-radius:50%; font-size:14px; line-height:22px; text-align:center; }
+  .addph{ width:84px; height:84px; border:1px dashed #b9c2cc; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--gray); font-size:12px; }
+  .addph span{ font-size:26px; line-height:1; }
+  .btn{ width:100%; font-size:17px; font-weight:700; padding:15px; border:none; border-radius:12px; background:var(--green); color:#fff; margin-top:6px; }
+  .btn:disabled{ opacity:.55; }
+  .btn.o{ background:#fff; color:var(--green-d); border:1.6px solid var(--green); }
+  .seg{ display:flex; gap:8px; margin-top:6px; }
+  .seg button{ flex:1; padding:12px 6px; border:1px solid var(--line); background:#fff; border-radius:10px; font-size:14px; color:#444; font-weight:600; }
+  .seg button.on{ background:var(--green); color:#fff; border-color:var(--green); }
+  .hidden{ display:none !important; }
+  .who{ font-size:12px; color:var(--gray); text-align:center; margin:2px 0 12px; }
+  .msg{ padding:10px 12px; border-radius:10px; font-size:14px; margin-bottom:10px; display:none; }
+  .msg.err{ background:#fdecea; color:var(--err); display:block; }
+  .loading{ text-align:center; padding:60px 16px; color:var(--gray); }
+  .done{ display:none; text-align:center; padding:30px 16px; }
+  .done .ic{ font-size:56px; }
+  .done h2{ color:var(--ok); margin:10px 0 4px; }
+  .sumtab{ text-align:left; background:#fff; border:1px solid var(--line); border-radius:12px; padding:6px 14px; margin:16px auto 0; max-width:360px; }
+  .sumtab .r{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f0f0f0; font-size:14px; }
+  .sumtab .r:last-child{ border-bottom:none; }
+  .sumtab .r .k{ color:var(--gray); }
+  .btn.ghost{ background:#fff; color:var(--green); border:1px solid var(--green); }
+</style>
+</head>
+<body>
+  <div class="head">🛠️ บันทึกงานซ่อม (ปิดงาน)</div>
+
+  <!-- ระหว่างยืนยันตัวตน + โหลดข้อมูล -->
+  <div class="wrap loading" id="loadView">กำลังยืนยันตัวตนผ่าน LINE…</div>
+
+  <div class="wrap" id="formView" style="display:none">
+    <div class="who" id="who"></div>
+    <div class="msg err" id="err"></div>
+
+    <div class="card">
+      <!-- โหมดปิดงาน: อ้างอิงใบแจ้ง (ล็อก) — โผล่เมื่อเปิดจากปุ่ม "ปิดงาน" -->
+      <div id="refWrap" class="hidden">
+        <label style="margin-top:0">ปิดงานตามใบแจ้ง</label>
+        <div class="refbox">
+          <div class="no" id="refNo">—</div>
+          <div class="dt" id="refDetail"></div>
+        </div>
+      </div>
+
+      <label id="vehLabel">รถ / เครื่องจักร <span class="req">*</span></label>
+      <!-- โหมดปิดงาน: ล็อกรถจากใบแจ้ง (แก้ไม่ได้) -->
+      <div class="lockbox hidden" id="vehLock"><span class="vf">✓</span><span id="vehLockName">—</span></div>
+      <!-- โหมดอิสระ: เลือกรถเอง -->
+      <select id="vehicle"><option value="">— กำลังโหลดรายชื่อ —</option></select>
+
+      <label>รายการซ่อม / อะไหล่ที่เปลี่ยน <span class="req">*</span></label>
+      <textarea id="items" placeholder="เช่น เปลี่ยนซีลไฮดรอลิก 2 จุด"></textarea>
+
+      <div class="row">
+        <div>
+          <label>ค่าอะไหล่ (บาท)</label>
+          <input type="number" id="partCost" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div>
+          <label>ค่าแรง (บาท)</label>
+          <input type="number" id="laborCost" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      <div class="preview" id="tot"></div>
+
+      <label>ประเภทการจ่าย</label>
+      <div class="seg" id="paySeg">
+        <button type="button" data-pay="เงินสด">เงินสด</button>
+        <button type="button" data-pay="เครดิตร้าน">เครดิตร้าน</button>
+        <button type="button" data-pay="บัตร">บัตร</button>
+      </div>
+      <div id="cardWrap" class="hidden">
+        <label>เลขท้ายบัตร 4 ตัว</label>
+        <input type="tel" id="cardLast4" inputmode="numeric" maxlength="4" placeholder="เช่น 1234">
+        <div class="hint">เก็บ 4 ตัวท้ายเท่านั้น ไม่เก็บเลขบัตรเต็ม</div>
+      </div>
+
+      <label>ร้าน / ผู้ให้บริการ</label>
+      <input type="text" id="garage" placeholder="ชื่อร้าน (ถ้ามี)">
+
+      <label>เลขไมล์ / ชม. ขณะซ่อม</label>
+      <input type="number" id="odometer" inputmode="decimal" min="0" step="1" placeholder="กรอกเพื่ออัปเดตรอบ PM">
+    </div>
+
+    <div class="card">
+      <label style="margin-top:0">รูปงานซ่อม / อะไหล่ (ไม่เกิน 3 รูป)</label>
+      <div class="photos" id="photos">
+        <label class="addph" id="addph">
+          <span>+</span>เพิ่มรูป
+          <input type="file" accept="image/*" id="file" style="display:none">
+        </label>
+      </div>
+    </div>
+
+    <button class="btn" id="submit">บันทึก + ปิดงาน</button>
+    <button class="btn o" id="quick">ปิดงานเร็ว (0 บาท)</button>
+    <div class="hint" style="text-align:center;margin-top:8px" id="footHint">ช่างกรอกราคาจริง → ระบบปิดงานให้ทันที + แจ้งเข้ากลุ่ม</div>
+  </div>
+
+  <div class="wrap done" id="doneView">
+    <div class="ic">✅</div>
+    <h2 id="doneTitle">บันทึกงานซ่อมสำเร็จ</h2>
+    <div class="who" id="doneNo"></div>
+    <div class="sumtab" id="doneSum"></div>
+    <button class="btn ghost" id="close" style="margin-top:18px">ปิดหน้าต่าง</button>
+  </div>
+
+<script>
+  // ============================================================
+  //  ตั้งค่า 2 จุด (ตรงกับ form_issue.html)
+  // ============================================================
+  var LIFF_ID = "2011005895-tXtEV8U6";                 // LIFF ID (เปิดเผยได้)
+  var API_URL = "https://script.google.com/macros/s/AKfycbx8Bkmrv696FP_dPGo-tKQehfBNm-vkIV0GFZC-3Dn38VH-J3tHfao9cMa20xx8h12z/exec";  // /exec ของ Apps Script
+  // ============================================================
+
+  var REPORTER_NAME = "";
+  var PHOTOS = [];
+  var VEHICLES = {};
+  var PAY_TYPE = "";
+  var ISSUE_ID = "";        // ใบแจ้งที่ปิดงาน (จาก ?issue=)
+  var ISSUE_CTX = null;     // ข้อมูลใบแจ้ง (รถ/อาการ) จากหลังบ้าน
+  var LOCKED = false;       // true = โหมดปิดงาน (ล็อกรถจากใบแจ้ง)
+
+  function $(id){ return document.getElementById(id); }
+  function qparam(k){ var m=new RegExp('[?&]'+k+'=([^&]*)').exec(location.search); return m?decodeURIComponent(m[1]):''; }
+  function showErr(t){ var e=$('err'); e.textContent=t; e.style.display=t?'block':'none'; if(t) window.scrollTo(0,0); }
+  function showLoad(t){ $('loadView').textContent=t; $('loadView').style.display='block'; $('formView').style.display='none'; }
+
+  // เรียก API หลังบ้าน (แนบ access token ทุกครั้ง — หลังบ้านยืนยันตัวตนเอง)
+  function apiCall(action, extra){
+    var token = liff.getAccessToken();
+    if(!token) return Promise.reject(new Error('ไม่พบ token — กรุณาเปิดฟอร์มผ่าน LINE อีกครั้ง'));
+    var body = { action: action, accessToken: token };
+    if(extra){ for(var k in extra) body[k]=extra[k]; }
+    // XMLHttpRequest แทน fetch — เบราว์เซอร์ในแอป LINE (iOS) ตาม redirect 302 ผ่าน fetch ไม่ได้
+    return new Promise(function(resolve, reject){
+      try{
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8'); // simple request → เลี่ยง CORS preflight
+        xhr.onload = function(){
+          try{ resolve(JSON.parse(xhr.responseText)); }
+          catch(e){ reject(new Error('อ่านผลลัพธ์หลังบ้านไม่ได้: ' + String(xhr.responseText).slice(0,120))); }
+        };
+        xhr.onerror = function(){ reject(new Error('เชื่อมต่อหลังบ้านไม่ได้ (network/CORS)')); };
+        xhr.ontimeout = function(){ reject(new Error('หลังบ้านตอบช้าเกินไป (timeout)')); };
+        xhr.timeout = 25000;
+        xhr.send(JSON.stringify(body));
+      }catch(e){ reject(e); }
+    });
+  }
+
+  function fillVehicles(list){
+    var sel=$('vehicle'); sel.innerHTML='<option value="">— เลือกรถ —</option>';
+    (list||[]).forEach(function(v){
+      VEHICLES[v.id]=v;
+      var o=document.createElement('option'); o.value=v.id; o.textContent=v.label; sel.appendChild(o);
+    });
+  }
+
+  // เข้าโหมดปิดงาน: ล็อกรถ + โชว์ใบแจ้ง (แก้รถไม่ได้ กันเลือกผิดคัน)
+  function applyIssueContext(ctx){
+    ISSUE_CTX = ctx; LOCKED = true;
+    $('refWrap').classList.remove('hidden');
+    $('refNo').textContent = 'ใบแจ้ง ' + ctx.issueId + (ctx.status ? ' · ' + ctx.status : '');
+    $('refDetail').textContent = (ctx.vehicleLabel || '') + (ctx.detail ? ' — ' + ctx.detail : '');
+    // ล็อกรถ
+    $('vehicle').classList.add('hidden');
+    $('vehLock').classList.remove('hidden');
+    $('vehLockName').textContent = ctx.vehicleLabel || ctx.vehicleId || '-';
+    $('vehLabel').innerHTML = 'รถ / เครื่องจักร <span class="req">*</span> (ล็อกจากใบแจ้ง)';
+    // เติมอาการเป็นตัวช่วยในช่องรายการ
+    if(ctx.detail) $('items').setAttribute('placeholder', 'อ้างอิงอาการ: ' + ctx.detail);
+  }
+
+  function currentVehicleId(){ return LOCKED ? (ISSUE_CTX && ISSUE_CTX.vehicleId) : $('vehicle').value; }
+
+  function onPay(ev){
+    var btn=ev.target.closest('button[data-pay]'); if(!btn) return;
+    PAY_TYPE=btn.getAttribute('data-pay');
+    $('paySeg').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b===btn); });
+    var isCard=(PAY_TYPE==='บัตร');
+    $('cardWrap').classList.toggle('hidden', !isCard);
+    if(!isCard) $('cardLast4').value='';
+  }
+  function calcTot(){
+    var p=parseFloat($('partCost').value)||0, l=parseFloat($('laborCost').value)||0, box=$('tot');
+    if(p>0||l>0){ box.style.display='block'; box.innerHTML='รวม <b>'+(p+l).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})+'</b> บาท'; }
+    else box.style.display='none';
+  }
+
+  function onFile(ev){
+    var f=ev.target.files[0]; ev.target.value='';
+    if(!f) return;
+    if(PHOTOS.length>=3){ showErr('แนบได้ไม่เกิน 3 รูป'); return; }
+    var img=new Image(), rd=new FileReader();
+    rd.onload=function(){ img.onload=function(){
+      var max=1280, w=img.width, h=img.height;
+      if(w>max||h>max){ if(w>h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+      var c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      var url=c.toDataURL('image/jpeg',0.8);
+      PHOTOS.push({ base64:url.split(',')[1], mimeType:'image/jpeg', url:url });
+      renderPhotos();
+    }; img.src=rd.result; };
+    rd.readAsDataURL(f);
+  }
+  function renderPhotos(){
+    var box=$('photos');
+    box.querySelectorAll('.thumb').forEach(function(n){ n.remove(); });
+    PHOTOS.forEach(function(p,i){
+      var d=document.createElement('div'); d.className='thumb';
+      d.innerHTML='<img src="'+p.url+'"><div class="x" data-i="'+i+'">×</div>';
+      box.insertBefore(d,$('addph'));
+    });
+    $('addph').style.display = PHOTOS.length>=3 ? 'none':'flex';
+    box.querySelectorAll('.x').forEach(function(x){ x.onclick=function(){ PHOTOS.splice(+x.getAttribute('data-i'),1); renderPhotos(); }; });
+  }
+
+  function send(quick){
+    showErr('');
+    var vId=currentVehicleId(), items=$('items').value.trim();
+    var C4=$('cardLast4').value.replace(/\D/g,'');
+    if(!vId){ showErr('กรุณาเลือกรถ'); return; }
+    if(!quick && !items){ showErr('กรุณากรอกรายการซ่อม / อะไหล่'); return; }
+    if(!quick && PAY_TYPE==='บัตร' && C4.length!==4){ showErr('กรุณากรอกเลขท้ายบัตร 4 ตัว'); return; }
+
+    var data={
+      vehicleId: vId,
+      issueId: ISSUE_ID || '',
+      workType: (ISSUE_CTX && ISSUE_CTX.category) || 'ซ่อมทั่วไป',
+      items: quick ? (items || 'ปิดงานเร็ว (ไม่มีค่าใช้จ่าย)') : items,
+      partCost: quick ? '0' : $('partCost').value,
+      laborCost: quick ? '0' : $('laborCost').value,
+      payType: quick ? '' : PAY_TYPE,
+      cardLast4: (!quick && PAY_TYPE==='บัตร') ? C4 : '',
+      garage: $('garage').value.trim(),
+      odometer: $('odometer').value
+    };
+    var photos = PHOTOS.map(function(p){ return { base64:p.base64, mimeType:p.mimeType }; });
+
+    var bs=$('submit'), bq=$('quick'); bs.disabled=true; bq.disabled=true;
+    (quick?bq:bs).textContent='กำลังบันทึก…';
+    apiCall('submitMaint', { data:data, photos:photos })
+      .then(function(res){
+        if(!res || !res.ok){ throw new Error((res&&res.message) || 'บันทึกไม่สำเร็จ'); }
+        onDone(res.result||{});
+      })
+      .catch(function(e){
+        bs.disabled=false; bq.disabled=false;
+        bs.textContent='บันทึก + ปิดงาน'; bq.textContent='ปิดงานเร็ว (0 บาท)';
+        showErr('บันทึกไม่สำเร็จ: '+e.message);
+      });
+  }
+
+  function onDone(res){
+    res=res||{};
+    var closed = !!res.closed;
+    $('formView').style.display='none'; $('doneView').style.display='block';
+    $('doneTitle').textContent = closed ? '✅ ปิดงานซ่อมสำเร็จ' : 'บันทึกงานซ่อมสำเร็จ';
+    $('doneNo').textContent = 'เลขบันทึก: '+(res.logId||'-') + (ISSUE_ID ? ('  ·  ใบแจ้ง '+ISSUE_ID) : '');
+    var pay = res.payType ? (res.payType + (res.cardLast4 ? ' ••'+String(res.cardLast4).replace(/\D/g,'').slice(-4) : '')) : '-';
+    var rows=[
+      ['รวม', (res.total!==''&&res.total!=null)? Number(res.total).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})+' บาท':'-'],
+      ['จ่ายโดย', pay]
+    ];
+    if(closed && res.closed && res.closed.days!=='' && res.closed.days!=null){
+      rows.push(['ระยะเวลาซ่อม', res.closed.days+' วัน']);
+    }
+    $('doneSum').innerHTML=rows.map(function(r){ return '<div class="r"><span class="k">'+r[0]+'</span><span>'+r[1]+'</span></div>'; }).join('');
+    window.scrollTo(0,0);
+  }
+
+  function closeWindow(){
+    if(liff.isInClient()){ liff.closeWindow(); }
+    else { location.reload(); }
+  }
+
+  function bindEvents(){
+    $('partCost').oninput=calcTot; $('laborCost').oninput=calcTot;
+    $('paySeg').onclick=onPay;
+    $('cardLast4').oninput=function(){ this.value=this.value.replace(/\D/g,'').slice(0,4); };
+    $('file').onchange=onFile;
+    $('submit').onclick=function(){ send(false); };
+    $('quick').onclick=function(){ send(true); };
+    $('close').onclick=closeWindow;
+  }
+
+  // ── เริ่มระบบ: LIFF init → ยืนยันตัวตน → โหลดชื่อ+รถ (+ ใบแจ้งถ้ามี ?issue=) ──
+  function startApp(){
+    var stage='init';
+    ISSUE_ID = qparam('issue');
+    liff.init({ liffId: LIFF_ID })
+      .then(function(){
+        stage='login';
+        if(!liff.isLoggedIn()){ liff.login(); return; }
+        showLoad('กำลังโหลดข้อมูล…');
+        stage='getBootstrap';
+        return apiCall('getBootstrap', ISSUE_ID ? { issue: ISSUE_ID } : null).then(function(res){
+          if(!res || !res.ok){ throw new Error((res&&res.message) || 'ยืนยันตัวตนไม่สำเร็จ'); }
+          REPORTER_NAME = res.name || '(ไม่พบชื่อ)';
+          $('who').textContent = 'ผู้บันทึก: ' + REPORTER_NAME;
+          fillVehicles(res.vehicles);
+          if(res.issueContext){ applyIssueContext(res.issueContext); }
+          else if(ISSUE_ID && res.issueMissing){ showErr('ไม่พบใบแจ้ง '+ISSUE_ID+' — บันทึกแบบไม่อ้างอิงใบแจ้งได้ แต่จะไม่ปิดงานอัตโนมัติ'); }
+          $('loadView').style.display='none';
+          $('formView').style.display='block';
+        });
+      })
+      .catch(function(e){
+        showLoad('เกิดข้อผิดพลาด ['+stage+']: ' + (e && e.message ? e.message : e) + '\nกรุณาแคปหน้านี้ส่งแอดมิน');
+      });
+  }
+
+  window.onload=function(){
+    bindEvents();
+    startApp();
+  };
+</script>
+</body>
+</html>

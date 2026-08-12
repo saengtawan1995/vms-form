@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>VMS · กำลังเปิดฟอร์ม…</title>
+<style>
+  body{ margin:0; font-family:-apple-system,"Segoe UI","Sarabun",sans-serif; background:#f4f6f8; color:#555;
+        display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .box{ text-align:center; padding:24px; }
+  .sp{ width:34px; height:34px; border:3px solid #d9dee4; border-top-color:#3D7EDB; border-radius:50%;
+       margin:0 auto 14px; animation:spin .8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  a{ color:#3D7EDB; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="sp"></div>
+    <div id="msg">กำลังเปิดฟอร์ม…</div>
+  </div>
+<script>
+  // ============================================================
+  //  Router — LIFF endpoint ชี้มาที่ไฟล์นี้ (index.html)
+  //  อ่าน ?page= แล้วพาไปฟอร์มที่ถูกต้อง โดยคง query อื่น (เช่น issue) ไว้
+  //  ปุ่มบน Rich Menu / การ์ด LINE เปิด liff.line.me/<id>?page=<page>&issue=<id>
+  //  LINE จะต่อ query ให้ index.html เห็น (บางเครื่องห่อใน liff.state)
+  // ============================================================
+  var PAGES = {                 // page → ไฟล์ฟอร์ม (whitelist กันพาไปหน้ามั่ว)
+    issue:     'form_issue.html',
+    maint:     'form_maint.html',
+    fuel:      'form_fuel.html',
+    breakdown: 'form_breakdown.html',
+    tax:       'form_tax.html',
+    register:  'form_register.html'
+  };
+  var DEFAULT_PAGE = 'issue';   // ไม่ระบุ page → ฟอร์มแจ้งซ่อม
+
+  // รวม params จาก query ตรง + liff.state (ที่ LINE ห่อ query เดิมไว้)
+  function collectParams(){
+    var out = {};
+    function eat(qs){
+      if(!qs) return;
+      if(qs.charAt(0)==='?') qs = qs.slice(1);
+      qs.split('&').forEach(function(pair){
+        if(!pair) return;
+        var i = pair.indexOf('=');
+        var k = i<0 ? pair : pair.slice(0,i);
+        var v = i<0 ? ''   : pair.slice(i+1);
+        try{ k=decodeURIComponent(k); v=decodeURIComponent(v); }catch(e){}
+        if(k && out[k]==null) out[k]=v;      // ไม่ทับค่าที่มาก่อน
+      });
+    }
+    eat(location.search);
+    if(out['liff.state']){ eat(out['liff.state']); delete out['liff.state']; }
+    return out;
+  }
+
+  function go(){
+    var p = collectParams();
+    var page = (p.page || DEFAULT_PAGE);
+    var file = PAGES[page] || PAGES[DEFAULT_PAGE];
+
+    // สร้าง query ใหม่ให้ฟอร์มปลายทาง — คงทุก param ยกเว้น page (ไม่ต้องใช้แล้ว)
+    var parts = [];
+    for(var k in p){
+      if(k==='page') continue;
+      parts.push(encodeURIComponent(k)+'='+encodeURIComponent(p[k]));
+    }
+    var url = file + (parts.length ? ('?'+parts.join('&')) : '');
+    document.getElementById('msg').textContent = 'กำลังเปิด '+page+'…';
+    location.replace(url);     // replace = ไม่ค้างใน history (กดย้อนกลับไม่วนมา router)
+  }
+
+  go();
+</script>
+</body>
+</html>

@@ -112,7 +112,7 @@
   //  ตั้งค่า 2 จุด (แก้ครั้งเดียว)
   // ============================================================
   var LIFF_ID = "2011005895-tXtEV8U6";                 // LIFF ID (เปิดเผยได้)
-  var API_URL = "https://script.google.com/macros/s/AKfycbx8Bkmrv696FP_dPGo-tKQehfBNm-vkIV0GFZC-3Dn38VH-J3tHfao9cMa20xx8h12z/exec";
+  var API_URL = "https://script.google.com/macros/s/AKfycbx8Bkmrv696FP_dPGo-tKQehfBNm-vkIV0GFZC-3Dn38VH-J3tHfao9cMa20xx8h12z/exec";  // /exec ของ Apps Script
   // ============================================================
 
   var REPORTER_NAME = "";
@@ -130,12 +130,23 @@
     if(!token) return Promise.reject(new Error('ไม่พบ token — กรุณาเปิดฟอร์มผ่าน LINE อีกครั้ง'));
     var body = { action: action, accessToken: token };
     if(extra){ for(var k in extra) body[k]=extra[k]; }
-    return fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // simple request → เลี่ยง CORS preflight
-      body: JSON.stringify(body),
-      redirect: 'follow'
-    }).then(function(r){ return r.json(); });
+    // ใช้ XMLHttpRequest แทน fetch — เบราว์เซอร์ในแอป LINE (iOS) ตาม redirect 302
+    // ของ Apps Script ผ่าน fetch ไม่ได้ (โยน "The string did not match the expected pattern")
+    return new Promise(function(resolve, reject){
+      try{
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8'); // simple request → เลี่ยง CORS preflight
+        xhr.onload = function(){
+          try{ resolve(JSON.parse(xhr.responseText)); }
+          catch(e){ reject(new Error('อ่านผลลัพธ์หลังบ้านไม่ได้: ' + String(xhr.responseText).slice(0,120))); }
+        };
+        xhr.onerror = function(){ reject(new Error('เชื่อมต่อหลังบ้านไม่ได้ (network/CORS)')); };
+        xhr.ontimeout = function(){ reject(new Error('หลังบ้านตอบช้าเกินไป (timeout)')); };
+        xhr.timeout = 25000;
+        xhr.send(JSON.stringify(body));
+      }catch(e){ reject(e); }
+    });
   }
 
   function fillVehicles(list){
@@ -241,10 +252,13 @@
 
   // ── เริ่มระบบ: LIFF init → ยืนยันตัวตน → โหลดชื่อ+รถ ──
   function startApp(){
+    var stage = 'init';   // บอกจุดที่พัง เผื่อยัง error จะได้รู้ทันที
     liff.init({ liffId: LIFF_ID })
       .then(function(){
+        stage = 'login';
         if(!liff.isLoggedIn()){ liff.login(); return; }   // ยังไม่ได้ล็อกอิน → พาไปล็อกอิน
         showLoad('กำลังโหลดข้อมูล…');
+        stage = 'getBootstrap';
         return apiCall('getBootstrap').then(function(res){
           if(!res || !res.ok){ throw new Error((res&&res.message) || 'ยืนยันตัวตนไม่สำเร็จ'); }
           REPORTER_NAME = res.name || '(ไม่พบชื่อ)';
@@ -255,7 +269,7 @@
         });
       })
       .catch(function(e){
-        showLoad('เกิดข้อผิดพลาด: ' + (e && e.message ? e.message : e) + '\nกรุณาปิดแล้วเปิดใหม่ผ่าน LINE');
+        showLoad('เกิดข้อผิดพลาด ['+stage+']: ' + (e && e.message ? e.message : e) + '\nกรุณาแคปหน้านี้ส่งแอดมิน');
       });
   }
 

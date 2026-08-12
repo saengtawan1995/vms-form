@@ -36,40 +36,63 @@
   };
   var DEFAULT_PAGE = 'issue';   // ไม่ระบุ page → ฟอร์มแจ้งซ่อม
 
-  // รวม params จาก query ตรง + liff.state (ที่ LINE ห่อ query เดิมไว้)
-  function collectParams(){
+  // whitelist ชื่อไฟล์ฟอร์ม — กัน redirect ไปไฟล์มั่ว
+  var FILES = {};
+  for (var _k in PAGES) FILES[PAGES[_k]] = true;
+
+  function dec_(v){ try{ return decodeURIComponent(v); }catch(e){ return v; } }
+
+  // แปลง query string → object (ไม่ทับค่าที่มาก่อน)
+  function parseQS_(qs){
     var out = {};
-    function eat(qs){
-      if(!qs) return;
-      if(qs.charAt(0)==='?') qs = qs.slice(1);
-      qs.split('&').forEach(function(pair){
-        if(!pair) return;
-        var i = pair.indexOf('=');
-        var k = i<0 ? pair : pair.slice(0,i);
-        var v = i<0 ? ''   : pair.slice(i+1);
-        try{ k=decodeURIComponent(k); v=decodeURIComponent(v); }catch(e){}
-        if(k && out[k]==null) out[k]=v;      // ไม่ทับค่าที่มาก่อน
-      });
-    }
-    eat(location.search);
-    if(out['liff.state']){ eat(out['liff.state']); delete out['liff.state']; }
+    if(!qs) return out;
+    if(qs.charAt(0)==='?') qs = qs.slice(1);
+    qs.split('&').forEach(function(pair){
+      if(!pair) return;
+      var i = pair.indexOf('=');
+      var k = i<0 ? pair : pair.slice(0,i);
+      var v = i<0 ? ''   : pair.slice(i+1);
+      k = dec_(k); v = dec_(v);
+      if(k && out[k]==null) out[k]=v;
+    });
     return out;
   }
 
+  function redirect_(url){
+    document.getElementById('msg').textContent = 'กำลังเปิดฟอร์ม…';
+    location.replace(url);     // replace = ไม่ค้างใน history (กดย้อนกลับไม่วนมา router)
+  }
+
   function go(){
-    var p = collectParams();
-    var page = (p.page || DEFAULT_PAGE);
+    var top = parseQS_(location.search);
+
+    // ── LINE ห่อ query/พาธเดิมไว้ใน liff.state ──
+    var state = top['liff.state'];
+    if(state){
+      var s = dec_(state);
+      // (A) liff.state ชี้ตรงไปที่ไฟล์ฟอร์ม เช่น "/form_maint.html?issue=xxx"
+      //     เกิดหลัง LIFF วิ่ง OAuth เสร็จแล้วเด้งกลับมาที่ router → พาไปไฟล์นั้นตรง ๆ
+      var m = s.match(/([A-Za-z0-9_]+\.html)(\?[^#]*)?/);
+      if(m && FILES[m[1]]){
+        redirect_(m[1] + (m[2] || ''));
+        return;
+      }
+      // (B) liff.state เป็น query "?page=maint&issue=xxx" — รวมเข้ากับ top
+      var sp = parseQS_(s.charAt(0)==='?' ? s : ('?'+s));
+      for(var k in sp){ if(top[k]==null) top[k]=sp[k]; }
+    }
+    delete top['liff.state'];
+
+    var page = top['page'] || DEFAULT_PAGE;
     var file = PAGES[page] || PAGES[DEFAULT_PAGE];
 
-    // สร้าง query ใหม่ให้ฟอร์มปลายทาง — คงทุก param ยกเว้น page (ไม่ต้องใช้แล้ว)
+    // คงทุก param ยกเว้น page (ไม่ต้องใช้แล้ว)
     var parts = [];
-    for(var k in p){
-      if(k==='page') continue;
-      parts.push(encodeURIComponent(k)+'='+encodeURIComponent(p[k]));
+    for(var k2 in top){
+      if(k2==='page') continue;
+      parts.push(encodeURIComponent(k2)+'='+encodeURIComponent(top[k2]));
     }
-    var url = file + (parts.length ? ('?'+parts.join('&')) : '');
-    document.getElementById('msg').textContent = 'กำลังเปิด '+page+'…';
-    location.replace(url);     // replace = ไม่ค้างใน history (กดย้อนกลับไม่วนมา router)
+    redirect_(file + (parts.length ? ('?'+parts.join('&')) : ''));
   }
 
   go();

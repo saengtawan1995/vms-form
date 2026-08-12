@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>🔧 แจ้งซ่อมบำรุง · VMS</title>
+<style>
+  :root{ --blue:#3D7EDB; --blue-d:#2B5FA8; --bg:#f4f6f8; --line:#e0e4e8; --gray:#8a8a8a; --ok:#2E7D32; --err:#C62828; --warn:#E8A13A; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:-apple-system,"Segoe UI","Sarabun",sans-serif; background:var(--bg); color:#1a1a1a; }
+  .head{ background:var(--blue); color:#fff; padding:16px; font-size:18px; font-weight:700; position:sticky; top:0; z-index:5; }
+  .wrap{ padding:14px; max-width:520px; margin:0 auto; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  label{ display:block; font-size:13px; color:#333; font-weight:600; margin:10px 0 5px; }
+  label .req{ color:var(--err); }
+  input,select,textarea{ width:100%; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:#1a1a1a; font-family:inherit; }
+  textarea{ min-height:70px; resize:vertical; }
+  input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--blue); }
+  .hint{ font-size:12px; color:var(--gray); margin-top:4px; }
+  .photos{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .thumb{ position:relative; width:84px; height:84px; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
+  .thumb img{ width:100%; height:100%; object-fit:cover; }
+  .thumb .x{ position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; width:22px; height:22px; border-radius:50%; font-size:14px; line-height:22px; text-align:center; }
+  .addph{ width:84px; height:84px; border:1px dashed #b9c2cc; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--gray); font-size:12px; }
+  .addph span{ font-size:26px; line-height:1; }
+  .btn{ width:100%; font-size:17px; font-weight:700; padding:15px; border:none; border-radius:12px; background:var(--blue); color:#fff; margin-top:6px; }
+  .btn:disabled{ opacity:.55; }
+  .seg{ display:flex; gap:8px; margin-top:6px; }
+  .seg button{ flex:1; padding:12px 6px; border:1px solid var(--line); background:#fff; border-radius:10px; font-size:14px; color:#444; font-weight:600; }
+  .seg button.on{ background:var(--blue); color:#fff; border-color:var(--blue); }
+  .seg button.on.warn{ background:var(--warn); border-color:var(--warn); }
+  .who{ font-size:12px; color:var(--gray); text-align:center; margin:2px 0 12px; }
+  .msg{ padding:10px 12px; border-radius:10px; font-size:14px; margin-bottom:10px; display:none; }
+  .msg.err{ background:#fdecea; color:var(--err); display:block; }
+  .done{ display:none; text-align:center; padding:30px 16px; }
+  .done .ic{ font-size:56px; }
+  .done h2{ color:var(--ok); margin:10px 0 4px; }
+  .sumtab{ text-align:left; background:#fff; border:1px solid var(--line); border-radius:12px; padding:6px 14px; margin:16px auto 0; max-width:360px; }
+  .sumtab .r{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f0f0f0; font-size:14px; }
+  .sumtab .r:last-child{ border-bottom:none; }
+  .sumtab .r .k{ color:var(--gray); }
+  .btn.ghost{ background:#fff; color:var(--blue); border:1px solid var(--blue); }
+</style>
+</head>
+<body>
+  <div class="head">🔧 แจ้งซ่อมบำรุง</div>
+
+  <div class="wrap" id="formView">
+    <div class="msg err" id="err"></div>
+
+    <div class="card">
+      <label style="margin-top:0">ผู้แจ้ง <span class="req">*</span></label>
+      <select id="reporter"><option value="">— กำลังโหลดรายชื่อ —</option></select>
+
+      <label>รถ / เครื่องจักร <span class="req">*</span></label>
+      <select id="vehicle"><option value="">— กำลังโหลดรายชื่อ —</option></select>
+
+      <label>ประเภทงาน <span class="req">*</span></label>
+      <div class="seg" id="workSeg">
+        <button type="button" data-work="ตามรอบ PM">ตามรอบ PM</button>
+        <button type="button" data-work="ซ่อมทั่วไป">ซ่อมทั่วไป</button>
+      </div>
+
+      <label>ความเร่งด่วน <span class="req">*</span></label>
+      <div class="seg" id="urgSeg">
+        <button type="button" data-urg="ปกติ">ปกติ</button>
+        <button type="button" data-urg="ด่วน" data-warn="1">ด่วน</button>
+      </div>
+      <div class="hint">งานวางแผน/ตามรอบ — เข้าคิว "รออนุมัติ" ก่อนลงมือ</div>
+
+      <label>อาการ / สิ่งที่ต้องทำ <span class="req">*</span></label>
+      <textarea id="detail" placeholder="เช่น ถึงรอบเปลี่ยนถ่ายน้ำมันเครื่อง…"></textarea>
+
+      <label>ประเมินค่าซ่อมเบื้องต้น (ถ้ามี)</label>
+      <input type="number" id="estCost" inputmode="decimal" min="0" step="0.01" placeholder="บาท (ไม่บังคับ)">
+    </div>
+
+    <div class="card">
+      <label style="margin-top:0">รูปภาพ (ไม่เกิน 3 รูป)</label>
+      <div class="photos" id="photos">
+        <label class="addph" id="addph">
+          <span>+</span>เพิ่มรูป
+          <input type="file" accept="image/*" id="file" style="display:none">
+        </label>
+      </div>
+    </div>
+
+    <button class="btn" id="submit">ส่งขออนุมัติ</button>
+    <div class="hint" style="text-align:center;margin-top:8px">ส่งแล้วเข้าขั้น "รออนุมัติ" จากผู้จัดการ</div>
+  </div>
+
+  <div class="wrap done" id="doneView">
+    <div class="ic">✅</div>
+    <h2>ส่งขออนุมัติแล้ว</h2>
+    <div class="who" id="doneNo"></div>
+    <div class="sumtab" id="doneSum"></div>
+    <button class="btn" id="again" style="margin-top:18px">แจ้งอีกรายการ</button>
+    <button class="btn ghost" id="close">ปิดหน้าต่าง</button>
+  </div>
+
+<script>
+  var USER_ID = "";
+  var REPORTER_NAME = "";
+  var PHOTOS = [];
+  var VEHICLES = {};
+  var WORK = "", URG = "";
+  var LS_KEY = "vms_reporter_id";
+
+  function $(id){ return document.getElementById(id); }
+  function showErr(t){ var e=$('err'); e.textContent=t; e.style.display=t?'block':'none'; if(t) window.scrollTo(0,0); }
+
+  function loadReporters(){
+    google.script.run
+      .withSuccessHandler(fillReporters)
+      .withFailureHandler(function(e){ showErr('โหลดรายชื่อผู้แจ้งไม่สำเร็จ: '+e.message); })
+      .getReporterOptions();
+  }
+  function fillReporters(list){
+    var sel=$('reporter'); sel.innerHTML='<option value="">— เลือกชื่อผู้แจ้ง —</option>';
+    var last=''; try{ last=localStorage.getItem(LS_KEY)||''; }catch(e){}
+    (list||[]).forEach(function(u){
+      var o=document.createElement('option');
+      o.value=u.id||('name:'+u.name);   // ถ้าไม่มี UserID ใช้ชื่อเป็น key ชั่วคราว
+      o.textContent=u.name;
+      o.setAttribute('data-name', u.name);
+      sel.appendChild(o);
+    });
+    if(last){ sel.value=last; }
+  }
+
+  function loadVehicles(){
+    google.script.run
+      .withSuccessHandler(fillVehicles)
+      .withFailureHandler(function(e){ showErr('โหลดรายชื่อรถไม่สำเร็จ: '+e.message); })
+      .getVehicleOptions();
+  }
+  function fillVehicles(list){
+    var sel=$('vehicle'); sel.innerHTML='<option value="">— เลือกรถ —</option>';
+    (list||[]).forEach(function(v){
+      VEHICLES[v.id]=v;
+      var o=document.createElement('option'); o.value=v.id; o.textContent=v.label; sel.appendChild(o);
+    });
+  }
+
+  function onSeg(segId, attr, setter){
+    return function(ev){
+      var btn=ev.target.closest('button['+attr+']'); if(!btn) return;
+      setter(btn.getAttribute(attr));
+      $(segId).querySelectorAll('button').forEach(function(b){
+        var on=(b===btn);
+        b.classList.toggle('on', on);
+        b.classList.toggle('warn', on && b.getAttribute('data-warn')==='1');
+      });
+    };
+  }
+
+  function onFile(ev){
+    var f=ev.target.files[0]; ev.target.value='';
+    if(!f) return;
+    if(PHOTOS.length>=3){ showErr('แนบได้ไม่เกิน 3 รูป'); return; }
+    var img=new Image(), rd=new FileReader();
+    rd.onload=function(){ img.onload=function(){
+      var max=1280, w=img.width, h=img.height;
+      if(w>max||h>max){ if(w>h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+      var c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      var url=c.toDataURL('image/jpeg',0.8);
+      PHOTOS.push({ base64:url.split(',')[1], mimeType:'image/jpeg', url:url });
+      renderPhotos();
+    }; img.src=rd.result; };
+    rd.readAsDataURL(f);
+  }
+  function renderPhotos(){
+    var box=$('photos');
+    box.querySelectorAll('.thumb').forEach(function(n){ n.remove(); });
+    PHOTOS.forEach(function(p,i){
+      var d=document.createElement('div'); d.className='thumb';
+      d.innerHTML='<img src="'+p.url+'"><div class="x" data-i="'+i+'">×</div>';
+      box.insertBefore(d,$('addph'));
+    });
+    $('addph').style.display = PHOTOS.length>=3 ? 'none':'flex';
+    box.querySelectorAll('.x').forEach(function(x){ x.onclick=function(){ PHOTOS.splice(+x.getAttribute('data-i'),1); renderPhotos(); }; });
+  }
+
+  function submit(){
+    showErr('');
+    var repSel=$('reporter'), repVal=repSel.value;
+    var vId=$('vehicle').value, detail=$('detail').value.trim();
+    if(!repVal){ showErr('กรุณาเลือกผู้แจ้ง'); return; }
+    if(!vId){ showErr('กรุณาเลือกรถ'); return; }
+    if(!WORK){ showErr('กรุณาเลือกประเภทงาน'); return; }
+    if(!URG){ showErr('กรุณาเลือกความเร่งด่วน'); return; }
+    if(!detail){ showErr('กรุณากรอกอาการ / สิ่งที่ต้องทำ'); return; }
+
+    // repVal = UserID จริง หรือ "name:ชื่อ" ถ้ายังไม่มี UserID ในระบบ
+    USER_ID = repVal.indexOf('name:')===0 ? '' : repVal;
+    REPORTER_NAME = repSel.options[repSel.selectedIndex].getAttribute('data-name') || '';
+    try{ localStorage.setItem(LS_KEY, repVal); }catch(e){}
+
+    var payload={
+      userId: USER_ID,
+      data:{ vehicleId:vId, workType:WORK, urgency:URG, detail:detail, estCost:$('estCost').value, reporterName:REPORTER_NAME },
+      photos: PHOTOS.map(function(p){ return { base64:p.base64, mimeType:p.mimeType }; })
+    };
+    var b=$('submit'); b.disabled=true; b.textContent='กำลังส่ง…';
+    google.script.run
+      .withSuccessHandler(onDone)
+      .withFailureHandler(function(e){ b.disabled=false; b.textContent='ส่งขออนุมัติ'; showErr('ส่งไม่สำเร็จ: '+e.message); })
+      .submitIssue(payload);
+  }
+
+  function onDone(res){
+    res=res||{};
+    $('formView').style.display='none'; $('doneView').style.display='block';
+    $('doneNo').textContent='เลขที่แจ้ง: '+(res.issueId||'-');
+    var rows=[ ['ประเภทงาน', WORK||'-'], ['ความเร่งด่วน', URG||'-'], ['สถานะ', res.status||'รออนุมัติ'] ];
+    $('doneSum').innerHTML=rows.map(function(r){ return '<div class="r"><span class="k">'+r[0]+'</span><span>'+r[1]+'</span></div>'; }).join('');
+    window.scrollTo(0,0);
+  }
+
+  function resetForm(){
+    PHOTOS=[]; renderPhotos();
+    $('detail').value=''; $('estCost').value='';
+    WORK=''; URG='';
+    ['workSeg','urgSeg'].forEach(function(s){ $(s).querySelectorAll('button').forEach(function(b){ b.classList.remove('on','warn'); }); });
+    $('doneView').style.display='none'; $('formView').style.display='block';
+    var b=$('submit'); b.disabled=false; b.textContent='ส่งขออนุมัติ';
+    window.scrollTo(0,0);
+  }
+
+  function closeWindow(){
+    // พยายามปิดหน้าต่าง (เบราว์เซอร์ในแอป LINE) — ถ้าปิดไม่ได้ ให้รีเซ็ตฟอร์มแทน
+    try{ window.close(); }catch(e){}
+    setTimeout(function(){ resetForm(); }, 300);
+  }
+
+  window.onload=function(){
+    $('workSeg').onclick=onSeg('workSeg','data-work',function(v){ WORK=v; });
+    $('urgSeg').onclick=onSeg('urgSeg','data-urg',function(v){ URG=v; });
+    $('file').onchange=onFile;
+    $('submit').onclick=submit;
+    $('again').onclick=resetForm;
+    $('close').onclick=closeWindow;
+
+    loadReporters();
+    loadVehicles();
+  };
+</script>
+</body>
+</html>

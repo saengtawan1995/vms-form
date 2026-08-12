@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>VMS · กำลังเปิดฟอร์ม…</title>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
   body{ margin:0; font-family:-apple-system,"Segoe UI","Sarabun",sans-serif; background:#f4f6f8; color:#555;
         display:flex; align-items:center; justify-content:center; min-height:100vh; }
@@ -22,10 +23,12 @@
 <script>
   // ============================================================
   //  Router — LIFF endpoint ชี้มาที่ไฟล์นี้ (index.html)
-  //  อ่าน ?page= แล้วพาไปฟอร์มที่ถูกต้อง โดยคง query อื่น (เช่น issue) ไว้
-  //  ปุ่มบน Rich Menu / การ์ด LINE เปิด liff.line.me/<id>?page=<page>&issue=<id>
-  //  LINE จะต่อ query ให้ index.html เห็น (บางเครื่องห่อใน liff.state)
+  //  สำคัญ: ต้องเรียก liff.init "ที่ endpoint นี้" เพื่อรับ login ให้จบก่อน
+  //  แล้วค่อยเด้งไปฟอร์มปลายทาง — ฟอร์มจะเจอ session แล้ว ไม่ login ซ้ำ (กันวนลูป)
+  //  ปุ่ม Rich Menu / การ์ด เปิด liff.line.me/<id>?page=<page>&issue=<id>
   // ============================================================
+  var LIFF_ID = "2011005895-tXtEV8U6";
+
   var PAGES = {                 // page → ไฟล์ฟอร์ม (whitelist กันพาไปหน้ามั่ว)
     issue:     'form_issue.html',
     maint:     'form_maint.html',
@@ -58,25 +61,16 @@
     return out;
   }
 
-  function redirect_(url){
-    document.getElementById('msg').textContent = 'กำลังเปิดฟอร์ม…';
-    location.replace(url);     // replace = ไม่ค้างใน history (กดย้อนกลับไม่วนมา router)
-  }
-
-  function go(){
+  // คำนวณ URL ฟอร์มปลายทางจาก ?page= / liff.state
+  function targetUrl(){
     var top = parseQS_(location.search);
 
-    // ── LINE ห่อ query/พาธเดิมไว้ใน liff.state ──
     var state = top['liff.state'];
     if(state){
       var s = dec_(state);
       // (A) liff.state ชี้ตรงไปที่ไฟล์ฟอร์ม เช่น "/form_maint.html?issue=xxx"
-      //     เกิดหลัง LIFF วิ่ง OAuth เสร็จแล้วเด้งกลับมาที่ router → พาไปไฟล์นั้นตรง ๆ
       var m = s.match(/([A-Za-z0-9_]+\.html)(\?[^#]*)?/);
-      if(m && FILES[m[1]]){
-        redirect_(m[1] + (m[2] || ''));
-        return;
-      }
+      if(m && FILES[m[1]]) return m[1] + (m[2] || '');
       // (B) liff.state เป็น query "?page=maint&issue=xxx" — รวมเข้ากับ top
       var sp = parseQS_(s.charAt(0)==='?' ? s : ('?'+s));
       for(var k in sp){ if(top[k]==null) top[k]=sp[k]; }
@@ -86,16 +80,28 @@
     var page = top['page'] || DEFAULT_PAGE;
     var file = PAGES[page] || PAGES[DEFAULT_PAGE];
 
-    // คงทุก param ยกเว้น page (ไม่ต้องใช้แล้ว)
     var parts = [];
     for(var k2 in top){
       if(k2==='page') continue;
       parts.push(encodeURIComponent(k2)+'='+encodeURIComponent(top[k2]));
     }
-    redirect_(file + (parts.length ? ('?'+parts.join('&')) : ''));
+    return file + (parts.length ? ('?'+parts.join('&')) : '');
   }
 
-  go();
+  function route(){
+    location.replace(targetUrl());   // replace = ไม่ค้างใน history
+  }
+
+  // init ที่ endpoint → รับ login ให้จบ → ค่อยเด้งไปฟอร์ม
+  liff.init({ liffId: LIFF_ID })
+    .then(function(){
+      if(!liff.isLoggedIn()){ liff.login(); return; }  // login "ที่ endpoint" ครั้งเดียว
+      route();
+    })
+    .catch(function(e){
+      // init พลาด → ยังพยายามพาไปฟอร์ม (ฟอร์มจะ init เองอีกที)
+      route();
+    });
 </script>
 </body>
 </html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>🚨 แจ้งรถเสียด่วน · VMS</title>
+<!-- LIFF SDK (ยืนยันตัวตนผู้บันทึกจาก LINE จริง) -->
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{ --red:#C62828; --red-d:#9B1C1C; --bg:#f4f6f8; --line:#e0e4e8; --gray:#8a8a8a; --ok:#2E7D32; --err:#C62828; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:-apple-system,"Segoe UI","Sarabun",sans-serif; background:var(--bg); color:#1a1a1a; }
+  .head{ background:var(--red); color:#fff; padding:16px; font-size:18px; font-weight:700; position:sticky; top:0; z-index:5; }
+  .wrap{ padding:14px; max-width:520px; margin:0 auto; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .alert{ background:#fde8e8; color:var(--red-d); border:1px solid #f5b7b7; border-radius:12px; padding:11px 13px; font-size:13px; font-weight:600; margin-bottom:12px; }
+  label{ display:block; font-size:13px; color:#333; font-weight:600; margin:10px 0 5px; }
+  label .req{ color:var(--err); }
+  input,select,textarea{ width:100%; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:#1a1a1a; font-family:inherit; }
+  textarea{ min-height:70px; resize:vertical; }
+  input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--red); }
+  .hint{ font-size:12px; color:var(--gray); margin-top:4px; }
+  .photos{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .thumb{ position:relative; width:84px; height:84px; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
+  .thumb img{ width:100%; height:100%; object-fit:cover; }
+  .thumb .x{ position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; width:22px; height:22px; border-radius:50%; font-size:14px; line-height:22px; text-align:center; }
+  .addph{ width:84px; height:84px; border:1px dashed #b9c2cc; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--gray); font-size:12px; }
+  .addph span{ font-size:26px; line-height:1; }
+  .btn{ width:100%; font-size:17px; font-weight:700; padding:15px; border:none; border-radius:12px; background:var(--red); color:#fff; margin-top:6px; }
+  .btn:disabled{ opacity:.55; }
+  .seg{ display:flex; gap:8px; margin-top:6px; }
+  .seg button{ flex:1; padding:12px 6px; border:1px solid var(--line); background:#fff; border-radius:10px; font-size:14px; color:#444; font-weight:600; }
+  .seg button.on{ background:var(--red); color:#fff; border-color:var(--red); }
+  .who{ font-size:12px; color:var(--gray); text-align:center; margin:2px 0 12px; }
+  .msg{ padding:10px 12px; border-radius:10px; font-size:14px; margin-bottom:10px; display:none; }
+  .msg.err{ background:#fdecea; color:var(--err); display:block; }
+  .loading{ text-align:center; padding:60px 16px; color:var(--gray); }
+  .done{ display:none; text-align:center; padding:30px 16px; }
+  .done .ic{ font-size:56px; }
+  .done h2{ color:var(--red-d); margin:10px 0 4px; }
+  .sumtab{ text-align:left; background:#fff; border:1px solid var(--line); border-radius:12px; padding:6px 14px; margin:16px auto 0; max-width:360px; }
+  .sumtab .r{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f0f0f0; font-size:14px; }
+  .sumtab .r:last-child{ border-bottom:none; }
+  .sumtab .r .k{ color:var(--gray); }
+  .btn.ghost{ background:#fff; color:var(--red); border:1px solid var(--red); }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+  <div class="head">🚨 แจ้งรถเสียด่วน</div>
+
+  <!-- ระหว่างยืนยันตัวตน + โหลดข้อมูล -->
+  <div class="wrap loading" id="loadView">กำลังยืนยันตัวตนผ่าน LINE…</div>
+
+  <!-- ฟอร์ม -->
+  <div class="wrap" id="formView" style="display:none">
+    <div class="who" id="who"></div>
+    <div class="msg err" id="err"></div>
+    <div class="alert">🚨 ฉุกเฉิน — ส่งแล้วเข้ากลุ่ม LINE ซ่อมทันที ไม่ต้องรออนุมัติ</div>
+
+    <div class="card">
+      <label>รถ / เครื่องจักร <span class="req">*</span></label>
+      <select id="vehicle"><option value="">— กำลังโหลดรายชื่อ —</option></select>
+
+      <label>อาการ / สิ่งที่พบ <span class="req">*</span></label>
+      <textarea id="detail" placeholder="เช่น ระบบไฮดรอลิกรั่ว น้ำมันหยด สตาร์ทไม่ติด…"></textarea>
+
+      <label>ตำแหน่ง / สถานที่ตอนนี้</label>
+      <input type="text" id="location" placeholder="เช่น ไซต์งานเทศบาลจุน / กม.ที่… (ถ้ารถเสียกลางทาง)">
+
+      <label>รถยังใช้งานได้ไหม <span class="req">*</span></label>
+      <div class="seg" id="mobSeg">
+        <button type="button" data-mob="พอขยับได้">พอขยับได้</button>
+        <button type="button" data-mob="จอดสนิท">จอดสนิท</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label style="margin-top:0">รูปจุดชำรุด (ไม่เกิน 3 รูป)</label>
+      <div class="photos" id="photos">
+        <label class="addph" id="addph">
+          <span>+</span>เพิ่มรูป
+          <input type="file" accept="image/*" id="file" style="display:none">
+        </label>
+      </div>
+    </div>
+
+    <button class="btn" id="submit">แจ้งด่วน → กลุ่มซ่อม</button>
+    <div class="hint" style="text-align:center;margin-top:8px">ยิงเข้ากลุ่ม LINE ซ่อม + แจ้งผู้จัดการทันที</div>
+  </div>
+
+  <!-- สำเร็จ -->
+  <div class="wrap done" id="doneView">
+    <div class="ic">🚨</div>
+    <h2>แจ้งด่วนแล้ว</h2>
+    <div class="who" id="doneNo"></div>
+    <div class="sumtab" id="doneSum"></div>
+    <button class="btn" id="again" style="margin-top:18px">แจ้งอีกรายการ</button>
+    <button class="btn ghost" id="close">ปิดหน้าต่าง</button>
+  </div>
+
+<script>
+  // ============================================================
+  //  ตั้งค่า 2 จุด (ตรงกับ form_maint.html / form_fuel.html)
+  // ============================================================
+  var LIFF_ID = "2011005895-tXtEV8U6";                 // LIFF ID (เปิดเผยได้)
+  var API_URL = "https://script.google.com/macros/s/AKfycbx8Bkmrv696FP_dPGo-tKQehfBNm-vkIV0GFZC-3Dn38VH-J3tHfao9cMa20xx8h12z/exec";  // /exec ของ Apps Script
+  // ============================================================
+
+  var REPORTER_NAME = "";
+  var PHOTOS = [];      // { base64, mimeType, url(preview) }
+  var VEHICLES = {};    // id -> option object
+  var MOB = "";         // สภาพรถ ที่เลือก
+
+  function $(id){ return document.getElementById(id); }
+  function qparam(k){ var m=new RegExp('[?&]'+k+'=([^&]*)').exec(location.search); return m?decodeURIComponent(m[1]):''; }
+  function showErr(t){ var e=$('err'); e.textContent=t; e.style.display=t?'block':'none'; if(t) window.scrollTo(0,0); }
+  function showLoad(t){ $('loadView').textContent=t; $('loadView').style.display='block'; $('formView').style.display='none'; }
+
+  // เรียก API หลังบ้าน (แนบ access token ทุกครั้ง — หลังบ้านยืนยันตัวตนเอง)
+  function apiCall(action, extra){
+    var token = liff.getAccessToken();
+    if(!token) return Promise.reject(new Error('ไม่พบ token — กรุณาเปิดฟอร์มผ่าน LINE อีกครั้ง'));
+    var body = { action: action, accessToken: token };
+    if(extra){ for(var k in extra) body[k]=extra[k]; }
+    // XMLHttpRequest แทน fetch — เบราว์เซอร์ในแอป LINE (iOS) ตาม redirect 302 ผ่าน fetch ไม่ได้
+    return new Promise(function(resolve, reject){
+      try{
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8'); // simple request → เลี่ยง CORS preflight
+        xhr.onload = function(){
+          try{ resolve(JSON.parse(xhr.responseText)); }
+          catch(e){ reject(new Error('อ่านผลลัพธ์หลังบ้านไม่ได้: ' + String(xhr.responseText).slice(0,120))); }
+        };
+        xhr.onerror = function(){ reject(new Error('เชื่อมต่อหลังบ้านไม่ได้ (network/CORS)')); };
+        xhr.ontimeout = function(){ reject(new Error('หลังบ้านตอบช้าเกินไป (timeout)')); };
+        xhr.timeout = 25000;
+        xhr.send(JSON.stringify(body));
+      }catch(e){ reject(e); }
+    });
+  }
+
+  /* ---------- โหลดรายชื่อรถ ---------- */
+  function fillVehicles(list){
+    var sel=$('vehicle'); sel.innerHTML='<option value="">— เลือกรถ —</option>';
+    (list||[]).forEach(function(v){
+      VEHICLES[v.id]=v;
+      var o=document.createElement('option'); o.value=v.id; o.textContent=v.label; sel.appendChild(o);
+    });
+  }
+
+  /* ---------- สภาพรถ ---------- */
+  function onMob(ev){
+    var btn=ev.target.closest('button[data-mob]'); if(!btn) return;
+    MOB=btn.getAttribute('data-mob');
+    $('mobSeg').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b===btn); });
+  }
+
+  /* ---------- รูป: ย่อ ~1280px แล้วเก็บ base64 ---------- */
+  function onFile(ev){
+    var f=ev.target.files[0]; ev.target.value='';
+    if(!f) return;
+    if(PHOTOS.length>=3){ showErr('แนบได้ไม่เกิน 3 รูป'); return; }
+    var img=new Image(), rd=new FileReader();
+    rd.onload=function(){ img.onload=function(){
+      var max=1280, w=img.width, h=img.height;
+      if(w>max||h>max){ if(w>h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+      var c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      var url=c.toDataURL('image/jpeg',0.8);
+      PHOTOS.push({ base64:url.split(',')[1], mimeType:'image/jpeg', url:url });
+      renderPhotos();
+    }; img.src=rd.result; };
+    rd.readAsDataURL(f);
+  }
+  function renderPhotos(){
+    var box=$('photos');
+    box.querySelectorAll('.thumb').forEach(function(n){ n.remove(); });
+    PHOTOS.forEach(function(p,i){
+      var d=document.createElement('div'); d.className='thumb';
+      d.innerHTML='<img src="'+p.url+'"><div class="x" data-i="'+i+'">×</div>';
+      box.insertBefore(d,$('addph'));
+    });
+    $('addph').style.display = PHOTOS.length>=3 ? 'none':'flex';
+    box.querySelectorAll('.x').forEach(function(x){ x.onclick=function(){ PHOTOS.splice(+x.getAttribute('data-i'),1); renderPhotos(); }; });
+  }
+
+  /* ---------- ส่ง ---------- */
+  function submit(){
+    showErr('');
+    var vId=$('vehicle').value, detail=$('detail').value.trim();
+    if(!vId){ showErr('กรุณาเลือกรถ'); return; }
+    if(!detail){ showErr('กรุณากรอกอาการ / สิ่งที่พบ'); return; }
+    if(!MOB){ showErr('กรุณาเลือกว่ารถยังใช้งานได้ไหม'); return; }
+
+    var data={
+      vehicleId: vId,
+      detail: detail,
+      location: $('location').value.trim(),
+      mobility: MOB
+    };
+    var photos = PHOTOS.map(function(p){ return { base64:p.base64, mimeType:p.mimeType }; });
+
+    var b=$('submit'); b.disabled=true; b.textContent='กำลังแจ้ง…';
+    apiCall('submitBreakdown', { data:data, photos:photos })
+      .then(function(res){
+        if(!res || !res.ok){ throw new Error((res&&res.message) || 'แจ้งไม่สำเร็จ'); }
+        onDone(res.result||{});
+      })
+      .catch(function(e){
+        b.disabled=false; b.textContent='แจ้งด่วน → กลุ่มซ่อม';
+        showErr('แจ้งไม่สำเร็จ: '+e.message);
+      });
+  }
+
+  function onDone(res){
+    res=res||{};
+    $('formView').style.display='none'; $('doneView').style.display='block';
+    $('doneNo').textContent='เลขที่แจ้ง: '+(res.issueId||'-');
+    var rows=[ ['สภาพรถ', MOB||'-'], ['สถานะ', res.status||'แจ้งด่วน'] ];
+    $('doneSum').innerHTML=rows.map(function(r){ return '<div class="r"><span class="k">'+r[0]+'</span><span>'+r[1]+'</span></div>'; }).join('');
+    window.scrollTo(0,0);
+  }
+
+  function resetForm(){
+    PHOTOS=[]; renderPhotos();
+    $('detail').value=''; $('location').value=''; MOB='';
+    $('mobSeg').querySelectorAll('button').forEach(function(b){ b.classList.remove('on'); });
+    $('doneView').style.display='none'; $('formView').style.display='block';
+    var b=$('submit'); b.disabled=false; b.textContent='แจ้งด่วน → กลุ่มซ่อม';
+    window.scrollTo(0,0);
+  }
+
+  function closeWindow(){
+    if(liff.isInClient()){ liff.closeWindow(); }
+    else { resetForm(); }
+  }
+
+  function bindEvents(){
+    $('mobSeg').onclick=onMob;
+    $('file').onchange=onFile;
+    $('submit').onclick=submit;
+    $('again').onclick=resetForm;
+    $('close').onclick=closeWindow;
+  }
+
+  // ── เริ่มระบบ: LIFF init → ยืนยันตัวตน → โหลดชื่อ + รายชื่อรถ ──
+  function startApp(){
+    var stage='init';
+    liff.init({ liffId: LIFF_ID })
+      .then(function(){
+        stage='login';
+        if(!liff.isLoggedIn()){ liff.login(); return; }
+        showLoad('กำลังโหลดข้อมูล…');
+        stage='getBootstrap';
+        return apiCall('getBootstrap', null).then(function(res){
+          if(!res || !res.ok){ throw new Error((res&&res.message) || 'ยืนยันตัวตนไม่สำเร็จ'); }
+          REPORTER_NAME = res.name || '(ไม่พบชื่อ)';
+          $('who').textContent = 'ผู้แจ้ง: ' + REPORTER_NAME;
+          fillVehicles(res.vehicles);
+          $('loadView').style.display='none';
+          $('formView').style.display='block';
+        });
+      })
+      .catch(function(e){
+        showLoad('เกิดข้อผิดพลาด ['+stage+']: ' + (e && e.message ? e.message : e) + '\nกรุณาแคปหน้านี้ส่งแอดมิน');
+      });
+  }
+
+  window.onload=function(){
+    bindEvents();
+    startApp();
+  };
+</script>
+</body>
+</html>

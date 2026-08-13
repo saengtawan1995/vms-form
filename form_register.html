@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>🚚 ลงทะเบียนรถใหม่ · VMS</title>
+<!-- LIFF SDK (ยืนยันตัวตนผู้บันทึกจาก LINE จริง) -->
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{ --main:#00695C; --main-d:#004D40; --bg:#f4f6f8; --line:#e0e4e8; --gray:#8a8a8a; --ok:#2E7D32; --err:#C62828; --warn:#E8A13A; --yellow:#FFF6D6; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:-apple-system,"Segoe UI","Sarabun",sans-serif; background:var(--bg); color:#1a1a1a; }
+  .head{ background:var(--main); color:#fff; padding:16px; font-size:18px; font-weight:700; position:sticky; top:0; z-index:5; }
+  .head small{ display:block; font-size:12px; font-weight:400; opacity:.85; margin-top:2px; }
+  .wrap{ padding:14px; max-width:520px; margin:0 auto; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .sechd{ font-size:13px; font-weight:700; color:var(--main-d); margin:2px 0 4px; }
+  label{ display:block; font-size:13px; color:#333; font-weight:600; margin:10px 0 5px; }
+  label .req{ color:var(--err); }
+  input,select,textarea{ width:100%; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:#1a1a1a; font-family:inherit; }
+  input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--main); }
+  input.yc{ background:var(--yellow); }
+  .row2{ display:flex; gap:8px; } .row2>div{ flex:1; }
+  .datepick{ display:flex; gap:8px; }
+  .datepick>div{ flex:1; }
+  .datepick>div:first-child{ flex:.6; }
+  .datepick>div:nth-child(2){ flex:1.3; }
+  .hint{ font-size:12px; color:var(--gray); margin-top:4px; }
+  .prev{ font-size:13px; color:var(--main-d); background:#e6f2f0; border-radius:8px; padding:8px 10px; margin-top:6px; font-weight:600; }
+  .photos{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .thumb{ position:relative; width:84px; height:84px; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
+  .thumb img{ width:100%; height:100%; object-fit:cover; }
+  .thumb .x{ position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; width:22px; height:22px; border-radius:50%; font-size:14px; line-height:22px; text-align:center; }
+  .addph{ width:84px; height:84px; border:1px dashed #b9c2cc; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--gray); font-size:12px; }
+  .addph span{ font-size:26px; line-height:1; }
+  .btn{ width:100%; font-size:17px; font-weight:700; padding:15px; border:none; border-radius:12px; background:var(--main); color:#fff; margin-top:6px; }
+  .btn:disabled{ opacity:.55; }
+  .btn.ghost{ background:#fff; color:var(--main); border:1px solid var(--main); }
+  .nav{ display:flex; gap:8px; margin-top:6px; }
+  .nav .btn{ margin-top:0; }
+  .seg{ display:flex; gap:8px; margin-top:6px; }
+  .seg button{ flex:1; padding:12px 6px; border:1px solid var(--line); background:#fff; border-radius:10px; font-size:14px; color:#444; font-weight:600; }
+  .seg button.on{ background:var(--main); color:#fff; border-color:var(--main); }
+  .steps{ display:flex; gap:6px; margin-bottom:10px; }
+  .steps div{ flex:1; text-align:center; font-size:12px; font-weight:700; color:var(--gray); padding:8px 2px; border-radius:8px; background:#fff; border:1px solid var(--line); }
+  .steps div.on{ color:#fff; background:var(--main); border-color:var(--main); }
+  .who{ font-size:12px; color:var(--gray); text-align:center; margin:2px 0 12px; }
+  .msg{ padding:10px 12px; border-radius:10px; font-size:14px; margin-bottom:10px; display:none; }
+  .msg.err{ background:#fdecea; color:var(--err); display:block; }
+  .loading{ text-align:center; padding:60px 16px; color:var(--gray); }
+  .done{ display:none; text-align:center; padding:30px 16px; }
+  .done .ic{ font-size:56px; }
+  .done h2{ color:var(--ok); margin:10px 0 4px; }
+  .sumtab{ text-align:left; background:#fff; border:1px solid var(--line); border-radius:12px; padding:6px 14px; margin:16px auto 0; max-width:360px; }
+  .sumtab .r{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f0f0f0; font-size:14px; }
+  .sumtab .r:last-child{ border-bottom:none; }
+  .sumtab .r .k{ color:var(--gray); }
+  .step-pane{ display:none; }
+  .step-pane.active{ display:block; }
+</style>
+</head>
+<body>
+  <div class="head">🚚 ลงทะเบียนรถใหม่ <small>Admin เท่านั้น</small></div>
+
+  <!-- ระหว่างยืนยันตัวตน + โหลดข้อมูล -->
+  <div class="wrap loading" id="loadView">กำลังยืนยันตัวตนผ่าน LINE…</div>
+
+  <!-- ฟอร์ม -->
+  <div class="wrap" id="formView" style="display:none">
+    <div class="who" id="who"></div>
+    <div class="msg err" id="err"></div>
+
+    <div class="steps">
+      <div id="st1" class="on">1 ข้อมูลรถ</div>
+      <div id="st2">2 ภาษี/ประกัน</div>
+      <div id="st3">3 รอบ PM</div>
+    </div>
+
+    <!-- ===== STEP 1 : ข้อมูลรถ ===== -->
+    <div class="step-pane active" id="pane1">
+      <div class="card">
+        <div class="sechd">ส่วนที่ 1 — ข้อมูลรถ</div>
+
+        <label>ประเภท <span class="req">*</span></label>
+        <select id="type"><option value="">— เลือกประเภท —</option></select>
+        <div class="prev" id="codePrev">ระบบตั้งรหัสให้: —</div>
+
+        <label>ชื่อเรียก <span class="req">*</span></label>
+        <input id="nickname" placeholder="เช่น รถโม่ 4">
+
+        <div class="row2">
+          <div>
+            <label>ยี่ห้อ</label>
+            <input id="brand" placeholder="เช่น HINO">
+          </div>
+          <div>
+            <label>รุ่น / ขนาด</label>
+            <input id="model" placeholder="เช่น FM 6 ล้อ">
+          </div>
+        </div>
+
+        <label>มีทะเบียนไหม <span class="req">*</span></label>
+        <div class="seg" id="plateSeg">
+          <button type="button" data-hp="มี">มีทะเบียน</button>
+          <button type="button" data-hp="ไม่มี">ไม่มี</button>
+        </div>
+
+        <div id="plateWrap">
+          <label>ทะเบียน</label>
+          <input id="plate" placeholder="เช่น 81-5678 พะเยา">
+        </div>
+
+        <label>วันที่ซื้อ</label>
+        <div class="datepick">
+          <div><select id="dateBought_d"></select></div>
+          <div><select id="dateBought_m"></select></div>
+          <div><select id="dateBought_y"></select></div>
+        </div>
+
+        <label>วันจดทะเบียน</label>
+        <div class="datepick">
+          <div><select id="dateRegistered_d"></select></div>
+          <div><select id="dateRegistered_m"></select></div>
+          <div><select id="dateRegistered_y"></select></div>
+        </div>
+      </div>
+      <button class="btn" id="next1">ถัดไป ▸ ภาษี/ประกัน</button>
+    </div>
+
+    <!-- ===== STEP 2 : ภาษี/ประกัน ===== -->
+    <div class="step-pane" id="pane2">
+      <div class="card">
+        <div class="sechd">ส่วนที่ 2 — ภาษี / ประกัน</div>
+        <div class="hint" id="taxNote">คันไม่มีทะเบียน — ข้ามส่วนภาษีได้</div>
+
+        <label>วันต่อภาษีล่าสุด</label>
+        <div class="datepick">
+          <div><select id="taxLatest_d"></select></div>
+          <div><select id="taxLatest_m"></select></div>
+          <div><select id="taxLatest_y"></select></div>
+        </div>
+
+        <label>วันครบกำหนดต่อภาษี</label>
+        <div class="datepick">
+          <div><select id="taxDue_d"></select></div>
+          <div><select id="taxDue_m"></select></div>
+          <div><select id="taxDue_y"></select></div>
+        </div>
+
+        <label>วันครบกำหนดประกันภัย</label>
+        <div class="datepick">
+          <div><select id="insuranceDue_d"></select></div>
+          <div><select id="insuranceDue_m"></select></div>
+          <div><select id="insuranceDue_y"></select></div>
+        </div>
+
+        <label>สถานที่ตรวจสภาพ</label>
+        <select id="inspectPlace">
+          <option value="">— เลือก —</option>
+          <option value="ขนส่ง">ขนส่ง (รถใหญ่/ตาม พ.ร.บ.ขนส่ง)</option>
+          <option value="ตรอ.">ตรอ. (รถเล็ก/ตาม พ.ร.บ.รถยนต์)</option>
+          <option value="ไม่ต้องตรวจ">ไม่ต้องตรวจ</option>
+        </select>
+      </div>
+      <div class="nav">
+        <button class="btn ghost" id="back2">◂ ย้อนกลับ</button>
+        <button class="btn" id="next2">ถัดไป ▸ รอบ PM</button>
+      </div>
+    </div>
+
+    <!-- ===== STEP 3 : รอบ PM ===== -->
+    <div class="step-pane" id="pane3">
+      <div class="card">
+        <div class="sechd">ส่วนที่ 3 — รอบบำรุง (PM) เฉพาะคันนี้</div>
+        <div class="hint" id="pmNote">ค่าเติมจากมาตรฐานประเภทรถ — แก้ให้ตรงรถจริงได้</div>
+
+        <label>รอบเปลี่ยนถ่าย (<span id="u1">กม.</span>) <span class="req">*</span></label>
+        <input type="number" id="pmOil" class="yc" inputmode="numeric" min="0" step="1">
+
+        <div class="row2">
+          <div>
+            <label>รอบ PM ตามเวลา (เดือน)</label>
+            <input type="number" id="pmMonth" class="yc" inputmode="numeric" min="0" step="1">
+          </div>
+          <div>
+            <label>รอบตรวจใหญ่ (<span id="u2">กม.</span>)</label>
+            <input type="number" id="pmMajor" class="yc" inputmode="numeric" min="0" step="1">
+          </div>
+        </div>
+
+        <label>เลข PM ล่าสุด (<span id="u3">กม.</span>) <span class="req">*</span></label>
+        <input type="number" id="pmLastNum" inputmode="numeric" min="0" step="1" placeholder="เช่น 125000">
+
+        <label>วันที่ PM ล่าสุด <span class="req">*</span></label>
+        <div class="datepick">
+          <div><select id="pmLastDate_d"></select></div>
+          <div><select id="pmLastDate_m"></select></div>
+          <div><select id="pmLastDate_y"></select></div>
+        </div>
+
+        <label>ผู้รับผิดชอบหลัก (คนขับ/ช่าง) <span class="req">*</span></label>
+        <select id="owner"><option value="">— เลือกจากรายชื่อ —</option></select>
+        <div class="prev">▸ ระบบคำนวณ "PM รอบถัดไป" + ตั้งเตือนให้อัตโนมัติ</div>
+      </div>
+
+      <div class="card">
+        <label style="margin-top:0">แนบรูปตัวรถ หน้า/ข้าง/ท้าย (ไม่เกิน 3 รูป)</label>
+        <div class="photos" id="photos">
+          <label class="addph" id="addph">
+            <span>+</span>เพิ่มรูป
+            <input type="file" accept="image/*" id="file" style="display:none">
+          </label>
+        </div>
+      </div>
+
+      <div class="nav">
+        <button class="btn ghost" id="back3">◂ ย้อนกลับ</button>
+        <button class="btn" id="submit">บันทึกลงทะเบียน</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- สำเร็จ -->
+  <div class="wrap done" id="doneView">
+    <div class="ic">✅</div>
+    <h2>ลงทะเบียนรถสำเร็จ</h2>
+    <div class="who" id="doneNo"></div>
+    <div class="sumtab" id="doneSum"></div>
+    <button class="btn" id="again" style="margin-top:18px">ลงทะเบียนคันใหม่</button>
+    <button class="btn ghost" id="close">ปิดหน้าต่าง</button>
+  </div>
+
+<script>
+  // ============================================================
+  //  ตั้งค่า 2 จุด (ตรงกับ form_maint.html / form_fuel.html)
+  // ============================================================
+  var LIFF_ID = "2011005895-tXtEV8U6";                 // LIFF ID (เปิดเผยได้)
+  var API_URL = "https://script.google.com/macros/s/AKfycbx8Bkmrv696FP_dPGo-tKQehfBNm-vkIV0GFZC-3Dn38VH-J3tHfao9cMa20xx8h12z/exec";  // /exec ของ Apps Script
+  // ============================================================
+
+  var REPORTER_NAME = "";
+  var PHOTOS = [];
+  var TYPES = [];        // แคตตาล็อกประเภทรถ
+  var CUR = null;        // ประเภทที่เลือกอยู่
+  var HP = "";           // มีทะเบียน? (มี/ไม่มี)
+
+  function $(id){ return document.getElementById(id); }
+  function qparam(k){ var m=new RegExp('[?&]'+k+'=([^&]*)').exec(location.search); return m?decodeURIComponent(m[1]):''; }
+  function showErr(t){ var e=$('err'); e.textContent=t; e.style.display=t?'block':'none'; if(t) window.scrollTo(0,0); }
+  function showLoad(t){ $('loadView').textContent=t; $('loadView').style.display='block'; $('formView').style.display='none'; }
+
+  // เรียก API หลังบ้าน (แนบ access token ทุกครั้ง — หลังบ้านยืนยันตัวตนเอง)
+  function apiCall(action, extra){
+    var token = liff.getAccessToken();
+    if(!token) return Promise.reject(new Error('ไม่พบ token — กรุณาเปิดฟอร์มผ่าน LINE อีกครั้ง'));
+    var body = { action: action, accessToken: token };
+    if(extra){ for(var k in extra) body[k]=extra[k]; }
+    // XMLHttpRequest แทน fetch — เบราว์เซอร์ในแอป LINE (iOS) ตาม redirect 302 ผ่าน fetch ไม่ได้
+    return new Promise(function(resolve, reject){
+      try{
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8'); // simple request → เลี่ยง CORS preflight
+        xhr.onload = function(){
+          try{ resolve(JSON.parse(xhr.responseText)); }
+          catch(e){ reject(new Error('อ่านผลลัพธ์หลังบ้านไม่ได้: ' + String(xhr.responseText).slice(0,120))); }
+        };
+        xhr.onerror = function(){ reject(new Error('เชื่อมต่อหลังบ้านไม่ได้ (network/CORS)')); };
+        xhr.ontimeout = function(){ reject(new Error('หลังบ้านตอบช้าเกินไป (timeout)')); };
+        xhr.timeout = 25000;
+        xhr.send(JSON.stringify(body));
+      }catch(e){ reject(e); }
+    });
+  }
+
+  // ---------- ตัวเลือกวันที่แบบไทย (วัน / เดือนไทย / ปี พ.ศ.) ----------
+  var THAI_MONTHS=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  function initDatePick(prefix){
+    var d=$(prefix+'_d'), m=$(prefix+'_m'), y=$(prefix+'_y');
+    d.innerHTML='<option value="">วัน</option>';
+    for(var i=1;i<=31;i++){ var o=document.createElement('option'); o.value=i; o.textContent=i; d.appendChild(o); }
+    m.innerHTML='<option value="">เดือน</option>';
+    THAI_MONTHS.forEach(function(name,idx){ var o=document.createElement('option'); o.value=idx+1; o.textContent=name; m.appendChild(o); });
+    y.innerHTML='<option value="">ปี พ.ศ.</option>';
+    var beNow=new Date().getFullYear()+543;
+    for(var yy=beNow-10; yy<=beNow+7; yy++){ var o=document.createElement('option'); o.value=yy; o.textContent=yy; y.appendChild(o); }
+  }
+  function pickIso(prefix){
+    var d=$(prefix+'_d').value, m=$(prefix+'_m').value, y=$(prefix+'_y').value;
+    if(!d || !m || !y) return '';
+    return (Number(y)-543)+'-'+('0'+m).slice(-2)+'-'+('0'+d).slice(-2);
+  }
+  function clearPick(prefix){ $(prefix+'_d').value=''; $(prefix+'_m').value=''; $(prefix+'_y').value=''; }
+
+  // ---------- เติมประเภทรถ + ผู้รับผิดชอบ ----------
+  function fillTypes(list){
+    TYPES = list||[];
+    var sel=$('type');
+    TYPES.forEach(function(t,i){
+      var o=document.createElement('option'); o.value=String(i); o.textContent=t.label+' ('+t.prefix+')'; sel.appendChild(o);
+    });
+  }
+  function fillOwners(list){
+    var sel=$('owner');
+    (list||[]).forEach(function(n){
+      var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o);
+    });
+  }
+
+  // ---------- เลือกประเภท → auto รหัส + หน่วย + PM ----------
+  function onType(){
+    var i=$('type').value;
+    if(i===''){ CUR=null; $('codePrev').textContent='ระบบตั้งรหัสให้: —'; return; }
+    CUR = TYPES[+i];
+    // หน่วยแสดงในป้าย PM
+    $('u1').textContent=CUR.unit; $('u2').textContent=CUR.unit; $('u3').textContent=CUR.unit;
+    // pre-fill รอบ PM (แก้ได้)
+    $('pmOil').value   = CUR.pmOil==='' ? '' : CUR.pmOil;
+    $('pmMonth').value = CUR.pmMonth==='' ? '' : CUR.pmMonth;
+    $('pmMajor').value = CUR.pmMajor==='' ? '' : CUR.pmMajor;
+    $('codePrev').textContent='ระบบตั้งรหัสให้: กำลังคำนวณ…';
+    apiCall('getVehicleCode', { prefix: CUR.prefix })
+      .then(function(res){
+        if(!res || !res.ok){ throw new Error('no code'); }
+        CUR._code=res.code; $('codePrev').textContent='ระบบตั้งรหัสให้: '+res.code;
+      })
+      .catch(function(){ $('codePrev').textContent='ระบบตั้งรหัสให้: '+CUR.prefix+'-??'; });
+  }
+
+  function onPlate(v){
+    HP=v;
+    $('plateSeg').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-hp')===v); });
+    $('plateWrap').style.display = (v==='ไม่มี') ? 'none' : 'block';
+  }
+
+  // ---------- นำทางระหว่างขั้น ----------
+  function goStep(n){
+    [1,2,3].forEach(function(k){
+      $('pane'+k).classList.toggle('active', k===n);
+      $('st'+k).classList.toggle('on', k<=n);
+    });
+    // ปรับข้อความส่วนภาษีตามมีทะเบียน
+    if(n===2){ $('taxNote').style.display = (HP==='ไม่มี') ? 'block':'none'; }
+    window.scrollTo(0,0);
+  }
+  function validStep1(){
+    showErr('');
+    if(!CUR){ showErr('กรุณาเลือกประเภทรถ'); return false; }
+    if(!$('nickname').value.trim()){ showErr('กรุณากรอกชื่อเรียก'); return false; }
+    if(!HP){ showErr('กรุณาเลือกว่ามีทะเบียนหรือไม่'); return false; }
+    return true;
+  }
+
+  // ---------- รูป ----------
+  function onFile(ev){
+    var f=ev.target.files[0]; ev.target.value='';
+    if(!f) return;
+    if(PHOTOS.length>=3){ showErr('แนบได้ไม่เกิน 3 รูป'); return; }
+    var img=new Image(), rd=new FileReader();
+    rd.onload=function(){ img.onload=function(){
+      var max=1280, w=img.width, h=img.height;
+      if(w>max||h>max){ if(w>h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+      var c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      var url=c.toDataURL('image/jpeg',0.8);
+      PHOTOS.push({ base64:url.split(',')[1], mimeType:'image/jpeg', url:url });
+      renderPhotos();
+    }; img.src=rd.result; };
+    rd.readAsDataURL(f);
+  }
+  function renderPhotos(){
+    var box=$('photos');
+    box.querySelectorAll('.thumb').forEach(function(n){ n.remove(); });
+    PHOTOS.forEach(function(p,i){
+      var d=document.createElement('div'); d.className='thumb';
+      d.innerHTML='<img src="'+p.url+'"><div class="x" data-i="'+i+'">×</div>';
+      box.insertBefore(d,$('addph'));
+    });
+    $('addph').style.display = PHOTOS.length>=3 ? 'none':'flex';
+    box.querySelectorAll('.x').forEach(function(x){ x.onclick=function(){ PHOTOS.splice(+x.getAttribute('data-i'),1); renderPhotos(); }; });
+  }
+
+  // ---------- ส่ง ----------
+  function submit(){
+    showErr('');
+    if(!CUR){ showErr('กรุณาเลือกประเภทรถ'); goStep(1); return; }
+    var pmLastDateIso=pickIso('pmLastDate');
+    if(!$('pmLastNum').value){ showErr('กรุณากรอกเลข PM ล่าสุด'); return; }
+    if(!pmLastDateIso){ showErr('กรุณากรอกวันที่ PM ล่าสุด'); return; }
+    if(!$('owner').value){ showErr('กรุณาเลือกผู้รับผิดชอบหลัก'); return; }
+
+    var d={
+      id:              CUR._code || '',
+      type:            CUR.label,
+      nickname:        $('nickname').value.trim(),
+      brand:           $('brand').value.trim(),
+      model:           $('model').value.trim(),
+      hasPlate:        HP,
+      plate:           (HP==='ไม่มี') ? '' : $('plate').value.trim(),
+      dateBoughtIso:     pickIso('dateBought'),
+      dateRegisteredIso: pickIso('dateRegistered'),
+      taxLatestIso:      pickIso('taxLatest'),
+      taxDueIso:         pickIso('taxDue'),
+      insuranceDueIso:   pickIso('insuranceDue'),
+      inspectPlace:      $('inspectPlace').value,
+      costCenter:      CUR.cc,
+      unit:            CUR.unit,
+      pmOilInterval:   $('pmOil').value,
+      pmMonthInterval: $('pmMonth').value,
+      majorInterval:   $('pmMajor').value,
+      pmLastNum:       $('pmLastNum').value,
+      pmLastDateIso:   pmLastDateIso,
+      owner:           $('owner').value,
+      status:          'ใช้งาน'
+    };
+    if(!d.id){ showErr('ยังไม่ได้รหัสรถ — เลือกประเภทใหม่อีกครั้ง'); goStep(1); return; }
+
+    var photos = PHOTOS.map(function(p){ return {base64:p.base64, mimeType:p.mimeType}; });
+    var b=$('submit'); b.disabled=true; b.textContent='กำลังบันทึก…';
+    apiCall('submitRegister', { data:d, photos:photos })
+      .then(function(res){
+        if(!res || !res.ok){ throw new Error((res&&res.message) || 'บันทึกไม่สำเร็จ'); }
+        onDone(res.result||{}, d);
+      })
+      .catch(function(e){
+        b.disabled=false; b.textContent='บันทึกลงทะเบียน';
+        showErr('บันทึกไม่สำเร็จ: '+e.message);
+      });
+  }
+
+  function onDone(res, d){
+    res=res||{};
+    $('formView').style.display='none'; $('doneView').style.display='block';
+    $('doneNo').textContent='รหัสรถ: '+(res.id || d.id || '-');
+    var rows=[
+      ['ประเภท', d.type||'-'],
+      ['ชื่อเรียก', d.nickname||'-'],
+      ['ทะเบียน', d.plate||'ไม่มี'],
+      ['Cost Center', d.costCenter||'-'],
+      ['ผู้รับผิดชอบ', d.owner||'-']
+    ];
+    $('doneSum').innerHTML=rows.map(function(r){ return '<div class="r"><span class="k">'+r[0]+'</span><span>'+r[1]+'</span></div>'; }).join('');
+    window.scrollTo(0,0);
+  }
+
+  function resetForm(){
+    PHOTOS=[]; renderPhotos();
+    CUR=null; HP='';
+    $('type').value=''; $('codePrev').textContent='ระบบตั้งรหัสให้: —';
+    ['nickname','brand','model','plate','pmOil','pmMonth','pmMajor','pmLastNum'].forEach(function(k){ $(k).value=''; });
+    ['dateBought','dateRegistered','taxLatest','taxDue','insuranceDue','pmLastDate'].forEach(clearPick);
+    $('inspectPlace').value=''; $('owner').value='';
+    $('plateSeg').querySelectorAll('button').forEach(function(b){ b.classList.remove('on'); });
+    $('plateWrap').style.display='block';
+    $('doneView').style.display='none'; $('formView').style.display='block';
+    var b=$('submit'); b.disabled=false; b.textContent='บันทึกลงทะเบียน';
+    goStep(1);
+  }
+
+  function closeWindow(){
+    if(liff.isInClient()){ liff.closeWindow(); }
+    else { resetForm(); }
+  }
+
+  function bindEvents(){
+    $('type').onchange=onType;
+    $('plateSeg').onclick=function(ev){ var b=ev.target.closest('button[data-hp]'); if(b) onPlate(b.getAttribute('data-hp')); };
+    $('next1').onclick=function(){ if(validStep1()) goStep(2); };
+    $('back2').onclick=function(){ goStep(1); };
+    $('next2').onclick=function(){ goStep(3); };
+    $('back3').onclick=function(){ goStep(2); };
+    $('file').onchange=onFile;
+    $('submit').onclick=submit;
+    $('again').onclick=resetForm;
+    $('close').onclick=closeWindow;
+  }
+
+  // ── เริ่มระบบ: LIFF init → ยืนยันตัวตน → โหลดชื่อ + ประเภทรถ + ผู้รับผิดชอบ ──
+  function startApp(){
+    var stage='init';
+    liff.init({ liffId: LIFF_ID })
+      .then(function(){
+        stage='login';
+        if(!liff.isLoggedIn()){ liff.login(); return; }
+        showLoad('กำลังโหลดข้อมูล…');
+        stage='getBootstrap';
+        return apiCall('getBootstrap', { withRegister: true }).then(function(res){
+          if(!res || !res.ok){ throw new Error((res&&res.message) || 'ยืนยันตัวตนไม่สำเร็จ'); }
+          REPORTER_NAME = res.name || '(ไม่พบชื่อ)';
+          $('who').textContent = 'ผู้ลงทะเบียน: ' + REPORTER_NAME;
+          fillTypes(res.vehicleTypes);
+          fillOwners(res.userOptions);
+          $('loadView').style.display='none';
+          $('formView').style.display='block';
+        });
+      })
+      .catch(function(e){
+        showLoad('เกิดข้อผิดพลาด ['+stage+']: ' + (e && e.message ? e.message : e) + '\nกรุณาแคปหน้านี้ส่งแอดมิน');
+      });
+  }
+
+  window.onload=function(){
+    ['dateBought','dateRegistered','taxLatest','taxDue','insuranceDue','pmLastDate'].forEach(initDatePick);
+    bindEvents();
+    startApp();
+  };
+</script>
+</body>
+</html>

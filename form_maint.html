@@ -53,6 +53,9 @@
   .sumtab .r:last-child{ border-bottom:none; }
   .sumtab .r .k{ color:var(--gray); }
   .btn.ghost{ background:#fff; color:var(--green); border:1px solid var(--green); }
+  .pline{ display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#f4faf4; border:1px solid #d9ecd9; border-radius:9px; margin-top:6px; font-size:14px; }
+  .pline .rm{ color:var(--err); font-weight:700; padding:0 8px; cursor:pointer; }
+  .pline .hint{ margin-top:2px; }
 </style>
 </head>
 <body>
@@ -84,16 +87,21 @@
       <label>รายการซ่อม / อะไหล่ที่เปลี่ยน <span class="req">*</span></label>
       <textarea id="items" placeholder="เช่น เปลี่ยนซีลไฮดรอลิก 2 จุด"></textarea>
 
+      <label>เบิกอะไหล่จากคลัง (ตัดสต๊อกอัตโนมัติ)</label>
       <div class="row">
-        <div>
-          <label>ค่าอะไหล่ (บาท)</label>
-          <input type="number" id="partCost" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
-        </div>
-        <div>
-          <label>ค่าแรง (บาท)</label>
-          <input type="number" id="laborCost" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
-        </div>
+        <div style="flex:2"><select id="partSel"><option value="">— เลือกอะไหล่ —</option></select></div>
+        <div style="flex:1"><input type="number" id="partQty" inputmode="decimal" min="0" step="1" placeholder="จำนวน"></div>
       </div>
+      <button type="button" class="btn o" id="addPart" style="margin-top:8px;padding:11px">+ เพิ่มอะไหล่จากคลัง</button>
+      <div id="issuedList"></div>
+      <div class="hint" id="stockHint" style="display:none"></div>
+
+      <label>อะไหล่ซื้อสดหน้างาน (บาท)</label>
+      <input type="number" id="cashPartCost" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+      <div class="hint">อะไหล่ที่ซื้อสดจากร้าน — ไม่ตัดสต๊อกในระบบ</div>
+
+      <label>ค่าแรง (บาท)</label>
+      <input type="number" id="laborCost" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
       <div class="preview" id="tot"></div>
 
       <label>ประเภทการจ่าย</label>
@@ -149,12 +157,15 @@
   var REPORTER_NAME = "";
   var PHOTOS = [];
   var VEHICLES = {};
+  var PARTS = {};           // แคตตาล็อกอะไหล่ (code -> {name,unit,onHand,avgCost})
+  var ISSUED = [];          // อะไหล่ที่เลือกเบิกจากคลัง [{code,name,unit,avgCost,qty}]
   var PAY_TYPE = "";
   var ISSUE_ID = "";        // ใบแจ้งที่ปิดงาน (จาก ?issue=)
   var ISSUE_CTX = null;     // ข้อมูลใบแจ้ง (รถ/อาการ) จากหลังบ้าน
   var LOCKED = false;       // true = โหมดปิดงาน (ล็อกรถจากใบแจ้ง)
 
   function $(id){ return document.getElementById(id); }
+  function fmt(n){ return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function qparam(k){ var m=new RegExp('[?&]'+k+'=([^&]*)').exec(location.search); return m?decodeURIComponent(m[1]):''; }
   function showErr(t){ var e=$('err'); e.textContent=t; e.style.display=t?'block':'none'; if(t) window.scrollTo(0,0); }
   function showLoad(t){ $('loadView').textContent=t; $('loadView').style.display='block'; $('formView').style.display='none'; }
@@ -216,10 +227,57 @@
     $('cardWrap').classList.toggle('hidden', !isCard);
     if(!isCard) $('cardLast4').value='';
   }
+  // ── เบิกอะไหล่จากคลัง ────────────────────────────────────────────
+  function fillParts(res){
+    res=res||{}; var sel=$('partSel');
+    (res.parts||[]).forEach(function(p){
+      PARTS[p.code]=p;
+      var o=document.createElement('option'); o.value=p.code;
+      o.textContent=p.code+' · '+p.name+' (คงเหลือ '+p.onHand+' '+(p.unit||'')+')';
+      sel.appendChild(o);
+    });
+  }
+  function stockSubtotal(){ return ISSUED.reduce(function(s,x){ return s+x.qty*(x.avgCost||0); },0); }
+  function addPart(){
+    showErr('');
+    var code=$('partSel').value, qty=parseFloat($('partQty').value)||0;
+    if(!code){ showErr('เลือกอะไหล่ก่อน'); return; }
+    if(qty<=0){ showErr('กรอกจำนวนอะไหล่ให้ถูกต้อง'); return; }
+    var p=PARTS[code]; if(!p) return;
+    var ex=ISSUED.filter(function(x){ return x.code===code; })[0];
+    var totalQty=qty+(ex?ex.qty:0);
+    if(totalQty>p.onHand){ showErr('เบิกเกินคงเหลือ: '+p.name+' มี '+p.onHand+' '+(p.unit||'')); return; }
+    if(ex) ex.qty=totalQty;
+    else ISSUED.push({ code:code, name:p.name, unit:p.unit, avgCost:p.avgCost, qty:qty });
+    $('partSel').value=''; $('partQty').value='';
+    renderIssued();
+  }
+  function renderIssued(){
+    var box=$('issuedList'); box.innerHTML='';
+    ISSUED.forEach(function(x,i){
+      var amt=x.qty*(x.avgCost||0);
+      var d=document.createElement('div'); d.className='pline';
+      d.innerHTML='<span>'+x.name+' × '+x.qty+' '+(x.unit||'')+
+        '<br><span class="hint">@ '+fmt(x.avgCost)+' = '+fmt(amt)+' บาท</span></span>'+
+        '<span class="rm" data-i="'+i+'">✕</span>';
+      box.appendChild(d);
+    });
+    box.querySelectorAll('.rm').forEach(function(b){
+      b.onclick=function(){ ISSUED.splice(+b.getAttribute('data-i'),1); renderIssued(); };
+    });
+    var h=$('stockHint');
+    if(ISSUED.length){ h.style.display='block'; h.textContent='ค่าอะไหล่จากคลัง (อัตโนมัติ): '+fmt(stockSubtotal())+' บาท'; }
+    else h.style.display='none';
+    calcTot();
+  }
   function calcTot(){
-    var p=parseFloat($('partCost').value)||0, l=parseFloat($('laborCost').value)||0, box=$('tot');
-    if(p>0||l>0){ box.style.display='block'; box.innerHTML='รวม <b>'+(p+l).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})+'</b> บาท'; }
-    else box.style.display='none';
+    var stock=stockSubtotal(), cash=parseFloat($('cashPartCost').value)||0, l=parseFloat($('laborCost').value)||0, box=$('tot');
+    var t=stock+cash+l;
+    if(t>0){
+      box.style.display='block';
+      box.innerHTML='รวม <b>'+fmt(t)+'</b> บาท'+
+        '<br><span class="hint">อะไหล่คลัง '+fmt(stock)+' + ซื้อสด '+fmt(cash)+' + ค่าแรง '+fmt(l)+'</span>';
+    } else box.style.display='none';
   }
 
   function onFile(ev){
@@ -263,7 +321,9 @@
       issueId: ISSUE_ID || '',
       workType: (ISSUE_CTX && ISSUE_CTX.category) || 'ซ่อมทั่วไป',
       items: quick ? (items || 'ปิดงานเร็ว (ไม่มีค่าใช้จ่าย)') : items,
-      partCost: quick ? '0' : $('partCost').value,
+      partCost: quick ? '0' : '',
+      issuedParts: quick ? [] : ISSUED.map(function(x){ return { code:x.code, qty:x.qty }; }),
+      cashPartCost: quick ? '' : $('cashPartCost').value,
       laborCost: quick ? '0' : $('laborCost').value,
       payType: quick ? '' : PAY_TYPE,
       cardLast4: (!quick && PAY_TYPE==='บัตร') ? C4 : '',
@@ -310,7 +370,8 @@
   }
 
   function bindEvents(){
-    $('partCost').oninput=calcTot; $('laborCost').oninput=calcTot;
+    $('addPart').onclick=addPart;
+    $('cashPartCost').oninput=calcTot; $('laborCost').oninput=calcTot;
     $('paySeg').onclick=onPay;
     $('cardLast4').oninput=function(){ this.value=this.value.replace(/\D/g,'').slice(0,4); };
     $('file').onchange=onFile;
@@ -329,11 +390,14 @@
         if(!liff.isLoggedIn()){ liff.login(); return; }
         showLoad('กำลังโหลดข้อมูล…');
         stage='getBootstrap';
-        return apiCall('getBootstrap', ISSUE_ID ? { issue: ISSUE_ID } : null).then(function(res){
+        var bootArgs = { withParts: true };
+        if(ISSUE_ID) bootArgs.issue = ISSUE_ID;
+        return apiCall('getBootstrap', bootArgs).then(function(res){
           if(!res || !res.ok){ throw new Error((res&&res.message) || 'ยืนยันตัวตนไม่สำเร็จ'); }
           REPORTER_NAME = res.name || '(ไม่พบชื่อ)';
           $('who').textContent = 'ผู้บันทึก: ' + REPORTER_NAME;
           fillVehicles(res.vehicles);
+          fillParts(res);
           if(res.issueContext){ applyIssueContext(res.issueContext); }
           else if(ISSUE_ID && res.issueMissing){ showErr('ไม่พบใบแจ้ง '+ISSUE_ID+' — บันทึกแบบไม่อ้างอิงใบแจ้งได้ แต่จะไม่ปิดงานอัตโนมัติ'); }
           $('loadView').style.display='none';

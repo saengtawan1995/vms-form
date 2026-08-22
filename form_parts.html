@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>📦 รับอะไหล่เข้า · VMS</title>
+<!-- LIFF SDK (ยืนยันตัวตนผู้บันทึกจาก LINE จริง) -->
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{ --main:#00695C; --main-d:#004D40; --bg:#f4f6f8; --line:#e0e4e8; --gray:#8a8a8a; --ok:#2E7D32; --err:#C62828; --warn:#E8A13A; --yellow:#FFF6D6; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:-apple-system,"Segoe UI","Sarabun",sans-serif; background:var(--bg); color:#1a1a1a; }
+  .head{ background:var(--main); color:#fff; padding:16px; font-size:18px; font-weight:700; position:sticky; top:0; z-index:5; }
+  .head small{ display:block; font-size:12px; font-weight:400; opacity:.85; margin-top:2px; }
+  .wrap{ padding:14px; max-width:520px; margin:0 auto; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .sechd{ font-size:13px; font-weight:700; color:var(--main-d); margin:2px 0 4px; }
+  label{ display:block; font-size:13px; color:#333; font-weight:600; margin:10px 0 5px; }
+  label .req{ color:var(--err); }
+  input,select,textarea{ width:100%; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:#1a1a1a; font-family:inherit; }
+  input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--main); }
+  input.yc{ background:var(--yellow); }
+  textarea{ min-height:64px; resize:vertical; }
+  .row2{ display:flex; gap:8px; } .row2>div{ flex:1; }
+  .datepick{ display:flex; gap:8px; }
+  .datepick>div{ flex:1; }
+  .datepick>div:first-child{ flex:.6; }
+  .datepick>div:nth-child(2){ flex:1.3; }
+  .hint{ font-size:12px; color:var(--gray); margin-top:4px; }
+  .prev{ font-size:13px; color:var(--main-d); background:#e6f2f0; border-radius:8px; padding:8px 10px; margin-top:6px; font-weight:600; }
+  .newbox{ display:none; border:1px dashed var(--main); border-radius:12px; padding:12px; margin-top:10px; background:#f2f9f8; }
+  .newbox.on{ display:block; }
+  .grps{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .grps label.chk{ flex:1 1 44%; display:flex; align-items:center; gap:8px; margin:0; font-weight:500; background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .grps label.chk input{ width:auto; }
+  .toggle{ display:flex; align-items:center; gap:8px; margin-top:8px; font-weight:600; }
+  .toggle input{ width:auto; }
+  .btn{ width:100%; font-size:17px; font-weight:700; padding:15px; border:none; border-radius:12px; background:var(--main); color:#fff; margin-top:6px; }
+  .btn:disabled{ opacity:.55; }
+  .btn.ghost{ background:#fff; color:var(--main); border:1px solid var(--main); }
+  .who{ font-size:12px; color:var(--gray); text-align:center; margin:2px 0 12px; }
+  .msg{ padding:10px 12px; border-radius:10px; font-size:14px; margin-bottom:10px; display:none; }
+  .msg.err{ background:#fdecea; color:var(--err); display:block; }
+  .warnbox{ font-size:13px; color:#8a5a00; background:#fff6e0; border:1px solid #f0d9a0; border-radius:8px; padding:8px 10px; margin-top:6px; display:none; }
+  .loading{ text-align:center; padding:60px 16px; color:var(--gray); white-space:pre-line; }
+  .done{ display:none; text-align:center; padding:30px 16px; }
+  .done .ic{ font-size:56px; }
+  .done h2{ color:var(--ok); margin:10px 0 4px; }
+  .sumtab{ text-align:left; background:#fff; border:1px solid var(--line); border-radius:12px; padding:6px 14px; margin:16px auto 0; max-width:360px; }
+  .sumtab .r{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f0f0f0; font-size:14px; }
+  .sumtab .r:last-child{ border-bottom:none; }
+  .sumtab .r .k{ color:var(--gray); }
+  .totbox{ font-size:14px; color:var(--main-d); background:#e6f2f0; border-radius:8px; padding:10px 12px; margin-top:8px; font-weight:600; display:none; }
+</style>
+</head>
+<body>
+  <div class="head">📦 รับอะไหล่เข้าสต๊อก <small>เลือกรหัสที่มี หรือเพิ่มรหัสใหม่ในฟอร์มเดียว</small></div>
+
+  <!-- ระหว่างยืนยันตัวตน + โหลดข้อมูล -->
+  <div class="wrap loading" id="loadView">กำลังยืนยันตัวตนผ่าน LINE…</div>
+
+  <!-- ฟอร์ม -->
+  <div class="wrap" id="formView" style="display:none">
+    <div class="who" id="who"></div>
+    <div class="msg err" id="err"></div>
+
+    <!-- ===== ส่วนที่ 1 : เลือกอะไหล่ ===== -->
+    <div class="card">
+      <div class="sechd">ส่วนที่ 1 — เลือกอะไหล่</div>
+
+      <label>รหัสอะไหล่ (รหัสหลัก) <span class="req">*</span></label>
+      <select id="partSel"><option value="">— เลือกอะไหล่ —</option></select>
+      <div class="prev" id="stockPrev" style="display:none">คงเหลือปัจจุบัน: —</div>
+
+      <!-- กล่องเพิ่มรหัสใหม่ (โผล่เมื่อเลือก "+ เพิ่มรหัสใหม่") -->
+      <div class="newbox" id="newBox">
+        <div class="sechd">➕ เพิ่มรหัสอะไหล่ใหม่</div>
+
+        <label>หมวดหมู่ <span class="req">*</span></label>
+        <select id="npCat"><option value="">— เลือกหมวดหมู่ —</option></select>
+        <div class="prev" id="npCodePrev">ระบบตั้งรหัสให้: —</div>
+
+        <label>ชื่ออะไหล่ <span class="req">*</span></label>
+        <input id="npName" placeholder="เช่น กรองน้ำมันเครื่อง HINO">
+
+        <label>หน่วยนับ</label>
+        <select id="npUnit"><option value="">— เลือกหน่วย —</option></select>
+
+        <label class="toggle"><input type="checkbox" id="npUniversal"> ใช้ร่วมได้ทุกคัน (ไม่ต้องระบุกลุ่มรถ)</label>
+
+        <div id="npGroupWrap">
+          <label>กลุ่มรถที่ใช้ได้</label>
+          <div class="grps" id="npGroups"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ส่วนที่ 2 : รายละเอียดการรับเข้า ===== -->
+    <div class="card">
+      <div class="sechd">ส่วนที่ 2 — รายละเอียดการรับเข้า</div>
+
+      <div class="row2">
+        <div>
+          <label>จำนวนที่รับเข้า <span class="req">*</span></label>
+          <input type="number" id="qty" class="yc" inputmode="decimal" min="0" step="any" placeholder="0">
+        </div>
+        <div>
+          <label>ราคาทุน/หน่วย (บาท) <span class="req">*</span></label>
+          <input type="number" id="unitCost" class="yc" inputmode="decimal" min="0" step="any" placeholder="0.00">
+        </div>
+      </div>
+      <div class="hint">ราคาทุนใส่ 0 ได้ถ้าเป็นของแถม/รับบริจาค — ระบบใช้คิดต้นทุนเฉลี่ยถ่วงน้ำหนัก</div>
+      <div class="totbox" id="totBox">รวมเงินรับเข้า: —</div>
+      <div class="warnbox" id="bigWarn">⚠️ ยอดรวมเกิน 100,000 บาท — ระบบจะให้ยืนยันอีกครั้งก่อนบันทึก</div>
+
+      <label>ผู้ขาย / เลขที่บิล</label>
+      <input id="supplier" placeholder="เช่น ร้านสมชายอะไหล่ / บิล 6812">
+
+      <label>วันที่รับเข้า</label>
+      <div class="datepick">
+        <div><select id="date_d"></select></div>
+        <div><select id="date_m"></select></div>
+        <div><select id="date_y"></select></div>
+      </div>
+      <div class="hint">เว้นว่าง = ใช้วันที่วันนี้</div>
+
+      <label>หมายเหตุ</label>
+      <textarea id="note" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+    </div>
+
+    <button class="btn" id="submit">บันทึกรับอะไหล่เข้า</button>
+  </div>
+
+  <!-- สำเร็จ -->
+  <div class="wrap done" id="doneView">
+    <div class="ic">✅</div>
+    <h2 id="doneTitle">รับอะไหล่เข้าสำเร็จ</h2>
+    <div class="who" id="doneNo"></div>
+    <div class="sumtab" id="doneSum"></div>
+    <button class="btn" id="again" style="margin-top:18px">รับอะไหล่รายการใหม่</button>
+    <button class="btn ghost" id="close">ปิดหน้าต่าง</button>
+  </div>
+
+<script>
+  // ============================================================
+  //  ตั้งค่า 2 จุด (ตรงกับ form_maint.html / form_register.html)
+  // ============================================================
+  var LIFF_ID = "2011005895-tXtEV8U6";                 // LIFF ID (เปิดเผยได้)
+  var API_URL = "https://script.google.com/macros/s/AKfycbx8Bkmrv696FP_dPGo-tKQehfBNm-vkIV0GFZC-3Dn38VH-J3tHfao9cMa20xx8h12z/exec";  // /exec ของ Apps Script
+  // ============================================================
+
+  var REPORTER_NAME = "";
+  var PARTS = {};          // รหัส → {code,name,unit,onHand,avgCost}
+  var CATS = [];           // [{label,prefix}]
+  var GROUPS = [];         // [{key,header}]
+  var NEWCODE = "";        // รหัสใหม่ที่เซิร์ฟเวอร์คำนวณให้ (พรีวิว)
+  var NEW = "__new__";     // ค่าพิเศษของ dropdown = เพิ่มรหัสใหม่
+  var BIG = 100000;        // เกณฑ์ยืนยันยอดใหญ่ (บาท)
+
+  function $(id){ return document.getElementById(id); }
+  function showErr(t){ var e=$('err'); e.textContent=t; e.style.display=t?'block':'none'; if(t) window.scrollTo(0,0); }
+  function showLoad(t){ $('loadView').textContent=t; $('loadView').style.display='block'; $('formView').style.display='none'; }
+  function fmt(n){ n=Number(n)||0; return n.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+  // เรียก API หลังบ้าน (แนบ access token ทุกครั้ง)
+  function apiCall(action, extra){
+    var token = liff.getAccessToken();
+    if(!token) return Promise.reject(new Error('ไม่พบ token — กรุณาเปิดฟอร์มผ่าน LINE อีกครั้ง'));
+    var body = { action: action, accessToken: token };
+    if(extra){ for(var k in extra) body[k]=extra[k]; }
+    return new Promise(function(resolve, reject){
+      try{
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8'); // เลี่ยง CORS preflight
+        xhr.onload = function(){
+          try{ resolve(JSON.parse(xhr.responseText)); }
+          catch(e){ reject(new Error('อ่านผลลัพธ์หลังบ้านไม่ได้: ' + String(xhr.responseText).slice(0,120))); }
+        };
+        xhr.onerror = function(){ reject(new Error('เชื่อมต่อหลังบ้านไม่ได้ (network/CORS)')); };
+        xhr.ontimeout = function(){ reject(new Error('หลังบ้านตอบช้าเกินไป (timeout)')); };
+        xhr.timeout = 25000;
+        xhr.send(JSON.stringify(body));
+      }catch(e){ reject(e); }
+    });
+  }
+
+  // ---------- ตัวเลือกวันที่แบบไทย (วัน / เดือนไทย / ปี พ.ศ.) ----------
+  var THAI_MONTHS=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  function initDatePick(prefix){
+    var d=$(prefix+'_d'), m=$(prefix+'_m'), y=$(prefix+'_y');
+    d.innerHTML='<option value="">วัน</option>';
+    for(var i=1;i<=31;i++){ var o=document.createElement('option'); o.value=i; o.textContent=i; d.appendChild(o); }
+    m.innerHTML='<option value="">เดือน</option>';
+    THAI_MONTHS.forEach(function(name,idx){ var o=document.createElement('option'); o.value=idx+1; o.textContent=name; m.appendChild(o); });
+    y.innerHTML='<option value="">ปี พ.ศ.</option>';
+    var beNow=new Date().getFullYear()+543;
+    for(var yy=beNow-3; yy<=beNow+1; yy++){ var o=document.createElement('option'); o.value=yy; o.textContent=yy; y.appendChild(o); }
+  }
+  function pickIso(prefix){
+    var d=$(prefix+'_d').value, m=$(prefix+'_m').value, y=$(prefix+'_y').value;
+    if(!d || !m || !y) return '';
+    return (Number(y)-543)+'-'+('0'+m).slice(-2)+'-'+('0'+d).slice(-2);
+  }
+  function setToday(prefix){
+    var t=new Date();
+    $(prefix+'_d').value=t.getDate();
+    $(prefix+'_m').value=t.getMonth()+1;
+    $(prefix+'_y').value=(t.getFullYear()+543);
+  }
+
+  // ---------- เติมข้อมูลจาก bootstrap ----------
+  function fillParts(list){
+    var sel=$('partSel');
+    (list||[]).forEach(function(p){
+      PARTS[p.code]=p;
+      var o=document.createElement('option'); o.value=p.code;
+      o.textContent=p.code+' · '+p.name+' (คงเหลือ '+p.onHand+' '+(p.unit||'')+')';
+      sel.appendChild(o);
+    });
+    // ตัวเลือกท้ายสุด = เพิ่มรหัสใหม่
+    var on=document.createElement('option'); on.value=NEW; on.textContent='➕ เพิ่มรหัสใหม่…'; sel.appendChild(on);
+  }
+  function fillCatalog(cat){
+    cat=cat||{};
+    CATS=cat.categories||[]; GROUPS=cat.groups||[];
+    var cs=$('npCat');
+    CATS.forEach(function(c,i){ var o=document.createElement('option'); o.value=String(i); o.textContent=c.label+' ('+c.prefix+')'; cs.appendChild(o); });
+    var us=$('npUnit');
+    (cat.units||[]).forEach(function(u){ var o=document.createElement('option'); o.value=u; o.textContent=u; us.appendChild(o); });
+    var gw=$('npGroups');
+    GROUPS.forEach(function(g){
+      var l=document.createElement('label'); l.className='chk';
+      l.innerHTML='<input type="checkbox" value="'+g.key+'"> '+g.header;
+      gw.appendChild(l);
+    });
+  }
+
+  // ---------- เลือกอะไหล่ ----------
+  function onPart(){
+    var v=$('partSel').value;
+    var isNew=(v===NEW);
+    $('newBox').classList.toggle('on', isNew);
+    if(isNew){
+      $('stockPrev').style.display='none';
+    } else if(v && PARTS[v]){
+      var p=PARTS[v];
+      $('stockPrev').style.display='block';
+      $('stockPrev').textContent='คงเหลือปัจจุบัน: '+p.onHand+' '+(p.unit||'');
+    } else {
+      $('stockPrev').style.display='none';
+    }
+  }
+
+  // ---------- เลือกหมวด → ขอรหัสใหม่จากเซิร์ฟเวอร์ ----------
+  function onCat(){
+    var i=$('npCat').value; NEWCODE='';
+    if(i===''){ $('npCodePrev').textContent='ระบบตั้งรหัสให้: —'; return; }
+    var pf=CATS[+i].prefix;
+    $('npCodePrev').textContent='ระบบตั้งรหัสให้: กำลังคำนวณ…';
+    apiCall('nextPartCode', { prefix: pf })
+      .then(function(res){ if(!res||!res.ok) throw new Error('no code'); NEWCODE=res.code; $('npCodePrev').textContent='ระบบตั้งรหัสให้: '+res.code; })
+      .catch(function(){ $('npCodePrev').textContent='ระบบตั้งรหัสให้: '+pf+'-??? (จะออกให้ตอนบันทึก)'; });
+  }
+  function onUniversal(){
+    var on=$('npUniversal').checked;
+    $('npGroupWrap').style.display = on ? 'none':'block';
+  }
+
+  // ---------- คำนวณยอดรวม ----------
+  function calcTot(){
+    var q=parseFloat($('qty').value)||0, c=parseFloat($('unitCost').value)||0, t=q*c;
+    var box=$('totBox'), warn=$('bigWarn');
+    if(q>0){ box.style.display='block'; box.textContent='รวมเงินรับเข้า: '+fmt(t)+' บาท'; }
+    else box.style.display='none';
+    warn.style.display = (t>BIG) ? 'block':'none';
+  }
+
+  // ---------- ส่ง ----------
+  function submit(){
+    showErr('');
+    var v=$('partSel').value;
+    var qty=parseFloat($('qty').value)||0, unitCost=parseFloat($('unitCost').value);
+    if(!v){ showErr('กรุณาเลือกอะไหล่ หรือกด "เพิ่มรหัสใหม่"'); return; }
+    if(!(qty>0)){ showErr('กรุณากรอกจำนวนที่รับเข้า (มากกว่า 0)'); return; }
+    if(!($('unitCost').value!=='' && unitCost>=0)){ showErr('กรุณากรอกราคาทุน/หน่วย (ใส่ 0 ได้ถ้าของแถม)'); return; }
+
+    var data={ qty:String(qty), unitCost:String(unitCost),
+               supplier:$('supplier').value.trim(), note:$('note').value.trim(), dateIso:pickIso('date') };
+
+    if(v===NEW){
+      var ci=$('npCat').value, name=$('npName').value.trim();
+      if(ci===''){ showErr('กรุณาเลือกหมวดหมู่อะไหล่ใหม่'); return; }
+      if(!name){ showErr('กรุณากรอกชื่ออะไหล่ใหม่'); return; }
+      var universal=$('npUniversal').checked;
+      var groups=[];
+      if(!universal){ $('npGroups').querySelectorAll('input:checked').forEach(function(x){ groups.push(x.value); }); }
+      data.code='';
+      data.newPart={ name:name, cat:CATS[+ci].label, unit:$('npUnit').value, groups:groups, universal:universal };
+    } else {
+      data.code=v;
+    }
+
+    // ยืนยันยอดใหญ่ก่อนบันทึก (ตามนโยบายรายการการเงิน > 100,000 บาท)
+    var tot=qty*unitCost;
+    if(tot>BIG && !window.confirm('ยอดรวมรับเข้า '+fmt(tot)+' บาท (เกิน 100,000)\nยืนยันบันทึกหรือไม่?')){ return; }
+
+    var b=$('submit'); b.disabled=true; b.textContent='กำลังบันทึก…';
+    apiCall('submitPartReceive', { data:data })
+      .then(function(res){
+        if(!res || !res.ok){ throw new Error((res&&res.message) || 'บันทึกไม่สำเร็จ'); }
+        var r=res.result||{};
+        if(r.ok===false){ throw new Error(r.msg || 'บันทึกไม่สำเร็จ'); }
+        onDone(r, data, qty, unitCost);
+      })
+      .catch(function(e){
+        b.disabled=false; b.textContent='บันทึกรับอะไหล่เข้า';
+        showErr('บันทึกไม่สำเร็จ: '+e.message);
+      });
+  }
+
+  function onDone(r, data, qty, unitCost){
+    r=r||{};
+    $('formView').style.display='none'; $('doneView').style.display='block';
+    $('doneTitle').textContent = r.created ? 'เพิ่มอะไหล่ + รับเข้าสำเร็จ' : 'รับอะไหล่เข้าสำเร็จ';
+    var code=r.code || data.code || '-';
+    $('doneNo').textContent='รหัสอะไหล่: '+code+(r.created?' (รหัสใหม่)':'');
+    var rows=[
+      ['จำนวนรับเข้า', String(qty)+(data.newPart&&data.newPart.unit?(' '+data.newPart.unit):'')],
+      ['ราคาทุน/หน่วย', fmt(unitCost)+' บาท'],
+      ['รวมเงิน', fmt(qty*unitCost)+' บาท'],
+      ['ผู้ขาย/บิล', data.supplier||'-']
+    ];
+    $('doneSum').innerHTML=rows.map(function(x){ return '<div class="r"><span class="k">'+x[0]+'</span><span>'+x[1]+'</span></div>'; }).join('');
+    window.scrollTo(0,0);
+  }
+
+  function resetForm(){
+    $('partSel').value=''; onPart();
+    $('npCat').value=''; NEWCODE=''; $('npCodePrev').textContent='ระบบตั้งรหัสให้: —';
+    $('npName').value=''; $('npUnit').value=''; $('npUniversal').checked=false; onUniversal();
+    $('npGroups').querySelectorAll('input:checked').forEach(function(x){ x.checked=false; });
+    ['qty','unitCost','supplier','note'].forEach(function(k){ $(k).value=''; });
+    setToday('date'); calcTot();
+    $('doneView').style.display='none'; $('formView').style.display='block';
+    var b=$('submit'); b.disabled=false; b.textContent='บันทึกรับอะไหล่เข้า';
+    window.scrollTo(0,0);
+  }
+
+  function closeWindow(){ if(liff.isInClient()){ liff.closeWindow(); } else { resetForm(); } }
+
+  function bindEvents(){
+    $('partSel').onchange=onPart;
+    $('npCat').onchange=onCat;
+    $('npUniversal').onchange=onUniversal;
+    $('qty').oninput=calcTot;
+    $('unitCost').oninput=calcTot;
+    $('submit').onclick=submit;
+    $('again').onclick=resetForm;
+    $('close').onclick=closeWindow;
+  }
+
+  // ── เริ่มระบบ: LIFF init → ยืนยันตัวตน → โหลดชื่อ + อะไหล่ + แคตตาล็อก ──
+  function startApp(){
+    var stage='init';
+    liff.init({ liffId: LIFF_ID })
+      .then(function(){
+        stage='login';
+        if(!liff.isLoggedIn()){ liff.login(); return; }
+        showLoad('กำลังโหลดข้อมูล…');
+        stage='getBootstrap';
+        return apiCall('getBootstrap', { withParts: true, withPartsCatalog: true }).then(function(res){
+          if(!res || !res.ok){ throw new Error((res&&res.message) || 'ยืนยันตัวตนไม่สำเร็จ'); }
+          REPORTER_NAME = res.name || '(ไม่พบชื่อ)';
+          $('who').textContent = 'ผู้บันทึก: ' + REPORTER_NAME;
+          fillParts(res.parts);
+          fillCatalog(res.catalog);
+          setToday('date');
+          $('loadView').style.display='none';
+          $('formView').style.display='block';
+        });
+      })
+      .catch(function(e){
+        showLoad('เกิดข้อผิดพลาด ['+stage+']: ' + (e && e.message ? e.message : e) + '\nกรุณาแคปหน้านี้ส่งแอดมิน');
+      });
+  }
+
+  window.onload=function(){
+    initDatePick('date');
+    bindEvents();
+    startApp();
+  };
+</script>
+</body>
+</html>
